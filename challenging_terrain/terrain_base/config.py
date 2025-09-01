@@ -41,5 +41,5 @@ class terrain_config:
                             1.35, 1.5, 1.65, 1.8, 1.95, 2.1, 2.25, 2.4, 2.55, 2.7, 2.85, 3.0, 3.15, 3.3, 3.45, 3.6]
         dataset_points_y = [-0.75, -0.6, -0.45, -0.3, -0.15, 0., 0.15, 0.3, 0.45, 0.6, 0.75]
 
-        slope_treshold = 1.5# slopes above this threshold will be corrected to vertical surfaces
+        slope_treshold = 1.5 # slopes above this threshold will be corrected to vertical surfaces
         origin_zero_z = True

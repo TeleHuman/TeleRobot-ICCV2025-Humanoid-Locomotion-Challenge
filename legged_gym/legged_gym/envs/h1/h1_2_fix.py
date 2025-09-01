@@ -31,7 +31,7 @@
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
 
-first_stage = True #False #True
+first_stage = True  #False #True
 
 class H1_2FixCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
@@ -72,7 +72,7 @@ class H1_2FixCfg( LeggedRobotCfg ):
         n_proprio = 51 
         history_len = 10
         num_observations = n_proprio + n_scan + history_len*n_proprio + n_priv_latent + n_priv 
-        num_privileged_obs = num_observations
+        num_privileged_obs = num_observations # + 4
         num_actions = 12
         env_spacing = 3.
 
@@ -153,8 +153,8 @@ class H1_2FixCfg( LeggedRobotCfg ):
             # [NOTE]  first stage
             if first_stage:
                 termination = -0.0
-                # tracking_lin_vel = 2.0
-                # tracking_ang_vel = 0.8
+                tracking_lin_vel = 2.0
+                tracking_ang_vel = 0.8
                 tracking_goal_vel = 1.5
                 tracking_yaw = 0.7
                 lin_vel_z = -2.0
@@ -179,8 +179,6 @@ class H1_2FixCfg( LeggedRobotCfg ):
             # # [NOTE]  second stage
             if not first_stage:
                 termination = -0.0
-                # tracking_lin_vel = 2.0
-                # tracking_ang_vel = 0.8
                 tracking_goal_vel = 1.5
                 tracking_yaw = 0.7
                 lin_vel_z = -0.5
@@ -206,8 +204,7 @@ class H1_2FixCfg( LeggedRobotCfg ):
                 collision = -10.
                 feet_stumble = -1.5 
                 action_rate = -0.01
-                stand_still = -0.
-                feet_contact_number = 0.0 
+                # feet_contact_number = 0.0 
 
                 feet_edge = -1.0
 
@@ -236,7 +233,7 @@ class H1_2FixCfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'h1_2_fix'
-        save_interval = 200
+        save_interval = 500
 
     class estimator(LeggedRobotCfgPPO.estimator):
         train_with_estimated_states = True
