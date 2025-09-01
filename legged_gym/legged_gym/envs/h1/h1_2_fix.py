@@ -30,6 +30,9 @@
 
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
+
+first_stage = True #False #True
+
 class H1_2FixCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 1.05]
@@ -69,6 +72,7 @@ class H1_2FixCfg( LeggedRobotCfg ):
         n_proprio = 51 
         history_len = 10
         num_observations = n_proprio + n_scan + history_len*n_proprio + n_priv_latent + n_priv 
+        num_privileged_obs = num_observations
         num_actions = 12
         env_spacing = 3.
 
@@ -110,7 +114,7 @@ class H1_2FixCfg( LeggedRobotCfg ):
         flip_visual_attachments = False
 
     class domain_rand(LeggedRobotCfg.domain_rand):
-        randomize_friction = True
+        randomize_friction = True 
         friction_range = [0.8, 0.8]
         randomize_base_mass = False
         added_mass_range = [0., 3.]
@@ -136,24 +140,83 @@ class H1_2FixCfg( LeggedRobotCfg ):
             lin_vel_y = [0.0, 0.0]
             ang_vel_yaw = [0, 0]
             heading = [0, 0]
+        cycletime = 0.02 * 40 # frequence * frames
 
-    class rewards:
+    class rewards(LeggedRobotCfg.rewards):
+        min_dist = 0.2
+        max_dist = 0.65
+        high_knees_target = -0.20 # 0.75 - 0.95
+        high_feet_target = -0.45  # 0.50 - 0.95
+        squat_height_target = 0.82 # h1: 0.75
+        feet_min_lateral_distance_target = 0.22 # [h1] 0.22   # [g1]0.17 
         class scales:
-            termination = -0.0
-            tracking_lin_vel = 1.0
-            tracking_ang_vel = 0.5
-            lin_vel_z = -2.0
-            ang_vel_xy = -0.05
-            orientation = -0.
-            torques = -0.00001
-            dof_vel = -0.
-            dof_acc = -2.5e-7
-            base_height = -0. 
-            feet_air_time =  1.0
-            collision = -1.
-            feet_stumble = -0.0 
-            action_rate = -0.01
-            stand_still = -0.
+            # [NOTE]  first stage
+            if first_stage:
+                termination = -0.0
+                # tracking_lin_vel = 2.0
+                # tracking_ang_vel = 0.8
+                tracking_goal_vel = 1.5
+                tracking_yaw = 0.7
+                lin_vel_z = -2.0
+                ang_vel_xy = -0.05
+                orientation = -2.0
+                torques = -0.00001
+                dof_vel = -1e-3 # -0.
+                dof_acc = -2.5e-7
+                base_height = -0. 
+                feet_air_time =  1.0
+                collision = -1.
+                feet_stumble = -1.0 
+                action_rate = -0.01
+                hip_joint_deviation = -1.2
+                stand_still = -0.
+                feet_contact_number = 2.0 
+                feet_distance = 0.2
+                knee_distance = 0.2
+
+            ######################
+
+            # # [NOTE]  second stage
+            if not first_stage:
+                termination = -0.0
+                # tracking_lin_vel = 2.0
+                # tracking_ang_vel = 0.8
+                tracking_goal_vel = 1.5
+                tracking_yaw = 0.7
+                lin_vel_z = -0.5
+                ang_vel_xy = -0.05
+                orientation = -2.0
+                torques = -0.00001
+                # dof_vel = -1e-3 # -0.
+                dof_acc = -2.5e-8
+                base_height = -0. 
+                # feet_air_time =  1.0
+
+
+                hip_joint_deviation = -0.5
+                # dof_pos_limits = -2.0
+                # dof_vel_limits = -1.0
+                # torque_limits = -1.0
+                feet_lateral_distance = 0.5 # 2 # 0.5
+                # feet_slippage = -0.25
+                # feet_contact_force = -2.5e-4
+                # feet_distance = 0.2
+                # knee_distance = 0.2
+                
+                collision = -10.
+                feet_stumble = -1.5 
+                action_rate = -0.01
+                stand_still = -0.
+                feet_contact_number = 0.0 
+
+                feet_edge = -1.0
+
+                # encourage higher 
+                high_knees_height = 2
+                high_feet_height = 2
+                base_height = 2.0
+
+            
 
         only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25 # tracking reward = exp(-error^2/sigma)
@@ -173,6 +236,7 @@ class H1_2FixCfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'h1_2_fix'
+        save_interval = 200
 
     class estimator(LeggedRobotCfgPPO.estimator):
         train_with_estimated_states = True

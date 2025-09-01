@@ -33,7 +33,7 @@ import os
 from collections import deque
 import statistics
 
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 import torch
 import torch.optim as optim
 import wandb
@@ -67,7 +67,8 @@ class OnPolicyRunner:
         print("Using MLP and Priviliged Env encoder ActorCritic structure")
         actor_critic: ActorCriticRMA = ActorCriticRMA(self.env.cfg.env.n_proprio,
                                                       self.env.cfg.env.n_scan,
-                                                      self.env.num_obs,
+                                                    #   self.env.num_obs,
+                                                      self.env.num_privileged_obs,
                                                       self.env.cfg.env.n_priv_latent,
                                                       self.env.cfg.env.n_priv,
                                                       self.env.cfg.env.history_len,
@@ -129,8 +130,8 @@ class OnPolicyRunner:
         priv_reg_coef = 0.
         entropy_coef = 0.
         # initialize writer
-        # if self.log_dir is not None and self.writer is None:
-        #     self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
+        if self.log_dir is not None and self.writer is None: 
+            self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(self.env.episode_length_buf, high=int(self.env.max_episode_length))
         obs = self.env.get_observations()
@@ -162,7 +163,9 @@ class OnPolicyRunner:
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
                     actions = self.alg.act(obs, critic_obs, infos, hist_encoding)
+                    # start_t = time.time()
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)  # obs has changed to next_obs !! if done obs has been reset
+                    # print("step time consumption: ", time.time()-start_t)
                     critic_obs = privileged_obs if privileged_obs is not None else obs
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
                     total_rew = self.alg.process_env_step(rewards, dones, infos)
@@ -194,8 +197,9 @@ class OnPolicyRunner:
                 # Learning step
                 start = stop
                 self.alg.compute_returns(critic_obs)
-            
+            start_t = time.time()
             mean_value_loss, mean_surrogate_loss, mean_estimator_loss, mean_disc_loss, mean_disc_acc, mean_priv_reg_loss, priv_reg_coef = self.alg.update()
+            print("update time consumption: ", time.time()-start_t)
             if hist_encoding:
                 print("Updating dagger...")
                 mean_hist_latent_loss = self.alg.update_dagger()
@@ -438,6 +442,38 @@ class OnPolicyRunner:
 
         wandb.log(wandb_dict, step=locs['it'])
 
+        self.writer.add_scalar('Loss/value_function', locs['mean_value_loss'], locs['it'])
+        self.writer.add_scalar('Loss/surrogate', locs['mean_surrogate_loss'], locs['it'])
+        # Loss
+        self.writer.add_scalar('Loss/estimator', locs['mean_estimator_loss'], locs['it'])
+        self.writer.add_scalar('Loss/hist_latent_loss', locs['mean_hist_latent_loss'], locs['it'])
+        self.writer.add_scalar('Loss/priv_reg_loss', locs['mean_priv_reg_loss'], locs['it'])
+        self.writer.add_scalar('Loss/priv_ref_lambda', locs['priv_reg_coef'], locs['it'])
+        self.writer.add_scalar('Loss/entropy_coef', locs['entropy_coef'], locs['it'])
+        self.writer.add_scalar('Loss/learning_rate', self.alg.learning_rate, locs['it'])
+        self.writer.add_scalar('Loss/discriminator', locs['mean_disc_loss'], locs['it'])
+        self.writer.add_scalar('Loss/discriminator_accuracy', locs['mean_disc_acc'], locs['it'])
+
+        # Policy
+        self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), locs['it'])
+
+        # Perf
+        self.writer.add_scalar('Perf/total_fps', fps, locs['it'])
+        self.writer.add_scalar('Perf/collection time', locs['collection_time'], locs['it'])
+        self.writer.add_scalar('Perf/learning_time', locs['learn_time'], locs['it'])
+
+        # Train
+        if len(locs['rewbuffer']) > 0:
+            self.writer.add_scalar('Train/mean_reward', statistics.mean(locs['rewbuffer']), locs['it'])
+            self.writer.add_scalar('Train/mean_reward_explr', statistics.mean(locs['rew_explr_buffer']), locs['it'])
+            self.writer.add_scalar('Train/mean_reward_task',
+                                statistics.mean(locs['rewbuffer']) - statistics.mean(locs['rew_explr_buffer']),
+                                locs['it'])
+            self.writer.add_scalar('Train/mean_reward_entropy', statistics.mean(locs['rew_entropy_buffer']), locs['it'])
+            self.writer.add_scalar('Train/mean_episode_length', statistics.mean(locs['lenbuffer']), locs['it'])
+
+
+
         str = f" \033[1m Learning iteration {locs['it']}/{self.current_learning_iteration + locs['num_learning_iterations']} \033[0m "
 
         if len(locs['rewbuffer']) > 0:
@@ -497,7 +533,7 @@ class OnPolicyRunner:
 
     def load(self, path, load_optimizer=True):
         print("*" * 80)
-        print("Loading model from {}...".format(path))
+        print("loading model from {}.".format(path))
         loaded_dict = torch.load(path, map_location=self.device)
         self.alg.actor_critic.load_state_dict(loaded_dict['model_state_dict'])
         self.alg.estimator.load_state_dict(loaded_dict['estimator_state_dict'])

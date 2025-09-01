@@ -236,10 +236,10 @@ class single_terrain:
                 start_y = 0,
                 platform_size=1.0, 
                 difficulty = 0.5,
-                height_range=[0.1,0.2],
-                size_range=[0.5,0.6]
+                height_range=[0.18, 0.38], #[0.1,0.2],
+                size_range=[0.5,0.6]#[0.5,0.6]
                 ):
-
+        # length_y = 8
         goals = np.zeros((num_goals, 2))
         platform_size = round(platform_size/ terrain.horizontal_scale)
         per_x = (round(length_x/ terrain.horizontal_scale)- platform_size) // num_goals
@@ -247,13 +247,13 @@ class single_terrain:
         step_height = round(((height_range[1]-height_range[0])*difficulty + height_range[0])/terrain.vertical_scale)
         step_x = round(((size_range[0]-size_range[1])*difficulty +size_range[1])/terrain.horizontal_scale)
         total_step_height = 0
-
+        # print("per_y= ", per_y)
         dis_x = start_x + platform_size
 
         for i in range(num_goals):
             goals[i]=[dis_x+per_x*i,start_y+per_y]
 
-        
+        # import pdb; pdb.set_trace()
         for i in range(num_goals):
 
             if(i < num_goals//2):
@@ -261,11 +261,12 @@ class single_terrain:
             else:
                  total_step_height -= step_height
             # total_step_height += step_height
-            terrain.height_field_raw[dis_x : dis_x + step_x, start_y : start_y + per_y*2] = total_step_height
+            terrain.height_field_raw[dis_x : dis_x + step_x, start_y  : start_y + per_y*2] = total_step_height
             dis_x += step_x
 
-        terrain.height_field_raw[start_x:start_x+platform_size,start_y:start_y + per_y*2] = 0
-        terrain.height_field_raw[dis_x:start_x+per_x*num_goals+2*platform_size,start_y:start_y + per_y*2] = total_step_height
+        # terrain.height_field_raw[start_x:start_x+platform_size,start_y:start_y + per_y*2] = 0
+        # terrain.height_field_raw[dis_x:start_x+per_x*num_goals+2*platform_size,start_y:start_y + per_y*2] = total_step_height
+        # import pdb; pdb.set_trace()
 
         return terrain,goals,start_x+per_x*num_goals
 

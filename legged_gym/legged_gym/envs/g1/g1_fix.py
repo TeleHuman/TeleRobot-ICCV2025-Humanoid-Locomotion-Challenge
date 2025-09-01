@@ -34,19 +34,18 @@ class G1FixCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 0.80]  # x,y,z [m]
         default_joint_angles = { # = target angles [rad] when action = 0.0
-           'left_hip_yaw_joint' : 0. ,
-           'left_hip_roll_joint' : 0,
-           'left_hip_pitch_joint' : -0.1,
-           'left_knee_joint' : 0.3,
-           'left_ankle_pitch_joint' : -0.2,
-           'left_ankle_roll_joint' : 0,
-           'right_hip_yaw_joint' : 0.,
-           'right_hip_roll_joint' : 0,
-           'right_hip_pitch_joint' : -0.1,
-           'right_knee_joint' : 0.3,
-           'right_ankle_pitch_joint': -0.2,
-           'right_ankle_roll_joint' : 0,
-           'torso_joint' : 0.
+           '0_left_hip_yaw_joint' : 0. ,
+           '0_left_hip_roll_joint' : 0,
+           '0_left_hip_pitch_joint' : -0.1,
+           '0_left_knee_joint' : 0.3,
+           '0_left_ankle_pitch_joint' : -0.2,
+           '0_left_ankle_roll_joint' : 0,
+           '0_right_hip_yaw_joint' : 0.,
+           '0_right_hip_roll_joint' : 0,
+           '0_right_hip_pitch_joint' : -0.1,
+           '0_right_knee_joint' : 0.3,
+           '0_right_ankle_pitch_joint': -0.2,
+           '0_right_ankle_roll_joint' : 0,
         }
 
     class env( LeggedRobotCfg.env ):
@@ -61,6 +60,7 @@ class G1FixCfg( LeggedRobotCfg ):
 
         # num obs = 53+132+10*53+43+9 = 187+47+530+43+9 = 816
         num_observations = n_proprio + n_scan + history_len*n_proprio + n_priv_latent + n_priv #n_scan + n_proprio + n_priv #187 + 47 + 5 + 12 
+        num_privileged_obs = num_observations+4
         num_actions = 12
         env_spacing = 3.  # not used with heightfields/trimeshes 
 
@@ -92,7 +92,7 @@ class G1FixCfg( LeggedRobotCfg ):
         decimation = 4
 
     class asset( LeggedRobotCfg.asset ):
-        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/g1/g1_12dof_with_hand.urdf'
+        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/g1/g1_12dof.urdf'
         name = "g1_fix_upper"
         foot_name = "ankle_roll"
         knee_name = "knee"
@@ -107,25 +107,52 @@ class G1FixCfg( LeggedRobotCfg ):
             lin_vel_y = [0.0, 0.0]   # min max [m/s]
             ang_vel_yaw = [0, 0]    # min max [rad/s]
             heading = [0, 0]
+        cycletime = 0.02 * 50 # frequence * frames
 
   
     class rewards:
         class scales:
+            # [NOTE]  first stage
             termination = -0.0
-            tracking_lin_vel = 1.0
-            tracking_ang_vel = 0.5
+            # tracking_lin_vel = 2.0
+            # tracking_ang_vel = 0.8
+            tracking_goal_vel = 1.5
+            tracking_yaw = 0.7
             lin_vel_z = -2.0
             ang_vel_xy = -0.05
-            orientation = -0.
+            orientation = -2.0
             torques = -0.00001
-            dof_vel = -0.
+            dof_vel = -1e-3 # -0.
             dof_acc = -2.5e-7
             base_height = -0. 
             feet_air_time =  1.0
             collision = -1.
-            feet_stumble = -0.0 
+            feet_stumble = -1.0 
             action_rate = -0.01
             stand_still = -0.
+            feet_contact_number = 2.0 
+
+            ######################
+
+            # # [NOTE]  second stage
+            # termination = -0.0
+            # # tracking_lin_vel = 2.0
+            # # tracking_ang_vel = 0.8
+            # tracking_goal_vel = 1.5
+            # tracking_yaw = 0.7
+            # lin_vel_z = -0.5
+            # ang_vel_xy = -0.05
+            # orientation = -2.0
+            # torques = -0.00001
+            # dof_vel = -1e-3 # -0.
+            # dof_acc = -2.5e-7
+            # base_height = -0. 
+            # feet_air_time =  1.0
+            # collision = -1.
+            # feet_stumble = -1.0 
+            # action_rate = -0.01
+            # stand_still = -0.
+            # feet_contact_number = 0.0 
 
         only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25 # tracking reward = exp(-error^2/sigma)
@@ -140,7 +167,7 @@ class G1FixCfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):
         entropy_coef = 0.01
     class runner( LeggedRobotCfgPPO.runner ):
-        run_name = ''
+        run_name = 'g1_fix'
         experiment_name = 'g1_fix'
         max_iterations = 50001 # number of policy updates
         save_interval = 500

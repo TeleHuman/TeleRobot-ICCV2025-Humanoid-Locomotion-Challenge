@@ -117,9 +117,19 @@ class HumanoidRobot(BaseTask):
         self.last_times = -1
         self.success_times = 0
         self.complete_times = 0.
-
+        self.custom_init()
         self.reset_idx(torch.arange(self.num_envs, device=self.device))
         self.post_physics_step()
+    
+    def custom_init(self):
+        self.phase_length_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+
+        self.feet_state = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices, :]
+        self.knee_state = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.knee_indices, :]
+        self.feet_pos = self.feet_state[:, :, :3]   
+        self.knee_pos = self.knee_state[:, :, :3]                                        
+        self.knee_pos_in_body = torch.zeros_like(self.knee_pos)
+        self.feet_pos_in_body = torch.zeros_like(self.feet_pos)
 
     def get_data_stats(self):
         """get dataset information"""
@@ -142,7 +152,7 @@ class HumanoidRobot(BaseTask):
         Args:
             actions (torch.Tensor): Tensor of shape (num_envs, num_actions_per_env)
         """
-
+        start_t = time()
         actions.to(self.device)
         self.action_history_buf = torch.cat([self.action_history_buf[:, 1:].clone(), actions[:, None, :].clone()], dim=1)
         if self.cfg.domain_rand.action_delay:
@@ -159,7 +169,9 @@ class HumanoidRobot(BaseTask):
         clip_actions = self.cfg.normalization.clip_actions / self.cfg.control.action_scale
         self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
         self.render()
+        # print("1111 coumse: ", time()-start_t)
 
+        start_t = time()
         for _ in range(self.cfg.control.decimation):
             self.torques = self._compute_torques(self.actions).view(self.torques.shape)
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
@@ -167,7 +179,9 @@ class HumanoidRobot(BaseTask):
             self.gym.fetch_results(self.sim, True)
             self.gym.refresh_dof_state_tensor(self.sim)
         self.post_physics_step()
+        # print("2222 coumse: ", time()-start_t)
 
+        start_t = time()
         clip_obs = self.cfg.normalization.clip_observations
         self.obs_buf = torch.clip(self.obs_buf, -clip_obs, clip_obs)
         if self.privileged_obs_buf is not None:
@@ -177,6 +191,7 @@ class HumanoidRobot(BaseTask):
             self.extras["depth"] = self.depth_buffer[:, -2]  # have already selected last one
         else:
             self.extras["depth"] = None
+        # print("3333 coumse: ", time()-start_t)
 
         if self.save:
             for env_idx in range(self.num_envs):
@@ -266,7 +281,7 @@ class HumanoidRobot(BaseTask):
 
         self.reached_goal_ids = torch.norm(self.root_states[:, :2] - self.cur_goals[:, :2], dim=1) < self.cfg.env.next_goal_threshold
         self.reach_goal_timer[self.reached_goal_ids] += 1
-
+        # print("cur_goals = ", self.cur_goals)
         self.target_pos_rel = self.cur_goals[:, :2] - self.root_states[:, :2]
         self.next_target_pos_rel = self.next_goals[:, :2] - self.root_states[:, :2]
 
@@ -289,6 +304,7 @@ class HumanoidRobot(BaseTask):
         # self.gym.refresh_force_sensor_tensor(self.sim)
 
         self.episode_length_buf += 1
+        self.phase_length_buf += 1 
         self.common_step_counter += 1
 
         # prepare quantities
@@ -297,6 +313,9 @@ class HumanoidRobot(BaseTask):
         self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
         self.projected_gravity[:] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
         self.base_lin_acc = (self.root_states[:, 7:10] - self.last_root_vel[:, :3]) / self.dt
+
+        self.knee_pos = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.knee_indices, 0:3]
+        self.feet_pos = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices, 0:3]
 
         self.roll, self.pitch, self.yaw = euler_from_quaternion(self.base_quat)
 
@@ -317,7 +336,7 @@ class HumanoidRobot(BaseTask):
         self.cur_goals = self._gather_cur_goals()
         self.next_goals = self._gather_cur_goals(future=1)
 
-        self.update_depth_buffer()
+        # self.update_depth_buffer()
 
         self.compute_observations() # in some cases a simulation step might be required to refresh some obs (for example body positions)
 
@@ -343,18 +362,21 @@ class HumanoidRobot(BaseTask):
                 cv2.imshow("Depth Image", self.depth_buffer[self.lookat_id, -1].cpu().numpy() + 0.5)
                 cv2.waitKey(1)
 
-    def reindex_feet(self, vec):
-        return vec[:, [1, 0, 3, 2]]
+        cur_knee_pos_trans = self.knee_pos - self.root_states[:, 0:3].unsqueeze(1)
+        for i in range(len(self.knee_indices)):
+            self.knee_pos_in_body[:, i, :] = quat_rotate_inverse(self.base_quat, cur_knee_pos_trans[:, i, :])
 
-    def reindex(self, vec):
-        return vec[:, [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]]
+        cur_feet_pos_trans = self.feet_pos - self.root_states[:, 0:3].unsqueeze(1)
+        for i in range(len(self.feet_indices)):
+            self.feet_pos_in_body[:, i, :] = quat_rotate_inverse(self.base_quat, cur_feet_pos_trans[:, i, :])
 
     def check_termination(self):
         """ Check if environments need to be reset
         """
-        self.reset_buf = torch.zeros((self.num_envs, ), dtype=torch.bool, device=self.device)
-        roll_cutoff = torch.abs(self.roll) > 1.5
-        pitch_cutoff = torch.abs(self.pitch) > 1.5
+        # self.reset_buf = torch.zeros((self.num_envs, ), dtype=torch.bool, device=self.device)
+        self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1., dim=1)
+        roll_cutoff = torch.abs(self.roll) > 0.6  #1.5
+        pitch_cutoff = torch.abs(self.pitch) > 0.6 #1.5
         reach_goal_cutoff = self.cur_goal_idx >= self.cfg.terrain.num_goals
         height_cutoff = self.root_states[:, 2] < 0.5
 
@@ -452,6 +474,8 @@ class HumanoidRobot(BaseTask):
         self.cur_goal_idx[env_ids] = 0
         self.reach_goal_timer[env_ids] = 0
 
+        self.phase_length_buf[env_ids] = 0 
+
         # fill extras
         self.extras["episode"] = {}
         for key in self.episode_sums.keys():
@@ -461,6 +485,7 @@ class HumanoidRobot(BaseTask):
 
         # log additional curriculum info
         if self.cfg.terrain.curriculum:
+            # print("terrain level = ", self.terrain_levels, " mean  ", torch.mean(self.terrain_levels.float()))
             self.extras["episode"]["terrain_level"] = torch.mean(self.terrain_levels.float())
         if self.cfg.commands.curriculum:
             self.extras["episode"]["max_command_x"] = self.command_ranges["lin_vel_x"][1]
@@ -490,12 +515,37 @@ class HumanoidRobot(BaseTask):
             rew = self._reward_termination() * self.reward_scales["termination"]
             self.rew_buf += rew
             self.episode_sums["termination"] += rew
-    
+
+    def  _get_phase(self):
+        cycle_time = self.cfg.commands.cycletime
+
+
+        phase = (self.phase_length_buf * self.dt / cycle_time) % 1.0
+        phase = torch.clip(phase, 0.0, 1.0)
+        return phase
+        
+    def _get_gait_phase(self):
+        # 根据实际的数据，直接以坐标轴的形式来完成 stance_mask 的分配。
+        # print("phase length buffer 111: ", self.phase_length_buf)
+        phase = self._get_phase()
+        stance_mask = torch.zeros((self.num_envs, 2), device=self.device)
+
+        stance_mask[:, 0] = (phase < 8/100)  | ((42/100 < phase) & (phase <= 100/100))
+        stance_mask[:, 1] = (phase < 58/100) | ((92/100 < phase) & (phase <= 100/100))
+
+        return stance_mask
+
+
     def compute_observations(self):
         """ 
         Computes observations
         即本体感知
         """
+        self._get_phase()
+
+        stance_mask = self._get_gait_phase()
+        contact_mask = self.contact_forces[:, self.feet_indices, 2] > 5 
+
         imu_obs = torch.stack((self.roll, self.pitch), dim=1)
         if self.global_counter % 5 == 0:
             self.delta_yaw = self.target_yaw - self.yaw
@@ -550,7 +600,14 @@ class HumanoidRobot(BaseTask):
                 self.contact_filt.float().unsqueeze(1)
             ], dim=1)
         )
-            
+
+        # self.privileged_obs_buf = torch.cat([
+        #         self.obs_buf,
+        #         stance_mask,
+        #         contact_mask,
+        #     ], dim=1)    
+
+
     def get_noisy_measurement(self, x, scale):
         if self.cfg.noise.add_noise:
             x = x + (2.0 * torch.rand_like(x) - 1) * scale * self.cfg.noise.noise_level
@@ -569,6 +626,7 @@ class HumanoidRobot(BaseTask):
         mesh_type = terrain_config.mesh_type
 
         if mesh_type=='None':
+            self.terrain = None
             self._create_ground_plane()
         else:
             self.terrain = Terrain(self.num_envs)
@@ -793,8 +851,10 @@ class HumanoidRobot(BaseTask):
         threshold = self.commands[env_ids, 0] * self.cfg.env.episode_length_s
         move_up =dis_to_origin > 0.8*threshold
         move_down = dis_to_origin < 0.4*threshold
-
+        # import ipdb;ipdb.set_trace()
         self.terrain_levels[env_ids] += 1 * move_up - 1 * move_down
+        # self.terrain_levels[env_ids] += 1 
+        # print("terrain level = ", self.terrain_levels)
         # # Robots that solve the last level are sent to a random one
         self.terrain_levels[env_ids] = torch.where(self.terrain_levels[env_ids]>=self.max_terrain_level,
                                                    torch.randint_like(self.terrain_levels[env_ids], self.max_terrain_level),
@@ -802,6 +862,8 @@ class HumanoidRobot(BaseTask):
         
         self.env_class[env_ids] = self.terrain_class[self.terrain_levels[env_ids], self.terrain_types[env_ids]]
         
+        self.env_origins[env_ids] = self.terrain_origins[self.terrain_levels[env_ids], self.terrain_types[env_ids]]
+
         temp = self.terrain_goals[self.terrain_levels, self.terrain_types]
         last_col = temp[:, -1].unsqueeze(1)
         self.env_goals[:] = torch.cat((temp, last_col.repeat(1, self.cfg.env.num_future_goal_obs, 1)), dim=1)[:]
@@ -940,6 +1002,7 @@ class HumanoidRobot(BaseTask):
         plane_params.dynamic_friction = self.cfg.terrain.dynamic_friction
         plane_params.restitution = self.cfg.terrain.restitution
         self.gym.add_ground(self.sim, plane_params)
+        
 
     def _create_trimesh(self):
         """ Adds a triangle mesh terrain to the simulation, sets parameters based on the cfg.
@@ -1117,6 +1180,11 @@ class HumanoidRobot(BaseTask):
             self.env_origins[:, 0] = spacing * xx.flatten()[:self.num_envs]
             self.env_origins[:, 1] = spacing * yy.flatten()[:self.num_envs]
             self.env_origins[:, 2] = 0.
+            # self.terrain_levels = torch.zeros((self.num_envs,), device=self.device)
+            self.env_goals = torch.zeros(self.num_envs, self.cfg.terrain.num_goals + self.cfg.env.num_future_goal_obs, 3, device=self.device, requires_grad=False)
+            self.cur_goal_idx = torch.zeros(self.num_envs, device=self.device, requires_grad=False, dtype=torch.long)
+            self.cur_goals = self._gather_cur_goals()
+            self.next_goals = self._gather_cur_goals(future=1)
         else:
             self.custom_origins = True
             self.env_origins = torch.zeros(self.num_envs, 3, device=self.device, requires_grad=False)
@@ -1290,9 +1358,11 @@ class HumanoidRobot(BaseTask):
         else:
             points = quat_apply_yaw(self.base_quat.repeat(1, self.num_height_points), self.height_points) + (self.root_states[:, :3]).unsqueeze(1)
             points_data = quat_apply_yaw(self.base_quat.repeat(1, self.num_height_points_data), self.height_points_data) + (self.root_states[:, :3]).unsqueeze(1)
+        
+        if self.terrain is not None:
+            points += self.terrain.cfg.border_size
+            points = (points/self.terrain.cfg.horizontal_scale).long()
 
-        points += self.terrain.cfg.border_size
-        points = (points/self.terrain.cfg.horizontal_scale).long()
         px = points[:, :, 0].view(-1)
         py = points[:, :, 1].view(-1)
         px = torch.clip(px, 0, self.height_samples.shape[0]-2)
@@ -1315,7 +1385,7 @@ class HumanoidRobot(BaseTask):
         heights3_data = self.height_samples[px_data, py_data+1]
         heights_data = torch.min(heights1_data, heights2_data)
         heights_data = torch.min(heights_data, heights3_data)
-
+        
         return heights.view(self.num_envs, -1) * self.terrain.cfg.vertical_scale, heights_data.view(self.num_envs, -1) * self.terrain.cfg.vertical_scale
 
     #------------ reward functions----------------
@@ -1410,3 +1480,100 @@ class HumanoidRobot(BaseTask):
     def _reward_feet_contact_forces(self):
         # penalize high contact forces
         return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) -  self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)
+
+    def _reward_feet_distance(self):
+        """
+        Calculates the reward based on the distance between the feet. Penalize feet get close to each other or too far away.
+        """
+        foot_pos = self.rigid_body_states[:, self.feet_indices, :2]
+        foot_dist = torch.norm(foot_pos[:, 0, :] - foot_pos[:, 1, :], dim=1)
+        # print("feet distance: ", foot_dist)
+        fd = self.cfg.rewards.min_dist
+        max_df = self.cfg.rewards.max_dist
+        d_min = torch.clamp(foot_dist - fd, -0.5, 0.)
+        d_max = torch.clamp(foot_dist - max_df, 0, 0.5)
+        return (torch.exp(-torch.abs(d_min) * 100) + torch.exp(-torch.abs(d_max) * 100)) / 2
+
+
+    def _reward_knee_distance(self):
+        """
+        Calculates the reward based on the distance between the knee of the humanoid.
+        """
+        foot_pos = self.rigid_body_states[:, self.knee_indices, :2]
+        foot_dist = torch.norm(foot_pos[:, 0, :] - foot_pos[:, 1, :], dim=1)
+        fd = self.cfg.rewards.min_dist
+        max_df = self.cfg.rewards.max_dist / 2
+        d_min = torch.clamp(foot_dist - fd, -0.5, 0.)
+        d_max = torch.clamp(foot_dist - max_df, 0, 0.5)
+        return (torch.exp(-torch.abs(d_min) * 100) + torch.exp(-torch.abs(d_max) * 100)) / 2
+
+    def _reward_tracking_goal_vel(self):
+        norm = torch.norm(self.target_pos_rel, dim=-1, keepdim=True)
+        target_vec_norm = self.target_pos_rel / (norm + 1e-5)
+        cur_vel = self.root_states[:, 7:9]
+        # print("target vec norm: ", target_vec_norm)
+        rew = torch.minimum(torch.sum(target_vec_norm * cur_vel, dim=-1), self.commands[:, 0]) / (self.commands[:, 0] + 1e-5)
+        return rew
+
+    def _reward_tracking_yaw(self):
+        # print("target yaw:  ", self.target_yaw)
+        rew = torch.exp(-torch.abs(self.target_yaw - self.yaw))
+        return rew
+
+    def _reward_feet_contact_number(self):
+        contact = self.contact_forces[:, self.feet_indices, 2] > 5
+        stance_mask = self._get_gait_phase()
+        reward = torch.where(contact == stance_mask, 1.0, -0.4)
+        return torch.mean(reward, dim=1)
+    
+    def _reward_feet_stumble(self):
+        # Penalize feet hitting vertical surfaces
+        rew = torch.any(torch.norm(self.contact_forces[:, self.feet_indices, :2], dim=2) >\
+             3 *torch.abs(self.contact_forces[:, self.feet_indices, 2]), dim=1)
+        return rew.float()
+    
+
+    def _reward_hip_joint_deviation(self):
+        return torch.square(torch.norm(torch.abs(self.dof_pos[:, [0, 2, 6, 8]]), dim=1))
+    
+
+    def _reward_feet_lateral_distance(self):
+        # Penalize feet lateral distance
+        cur_footpos_translated = self.feet_pos - self.root_states[:, 0:3].unsqueeze(1)
+        footpos_in_body_frame = torch.zeros(self.num_envs, len(self.feet_indices), 3, device=self.device)
+        for i in range(len(self.feet_indices)):
+            footpos_in_body_frame[:, i, :] = quat_rotate_inverse(self.base_quat, cur_footpos_translated[:, i, :])
+        rew = (footpos_in_body_frame[:, 0, 1] - footpos_in_body_frame[:, 1, 1]) - self.cfg.rewards.feet_min_lateral_distance_target
+        return rew
+    
+    def _reward_feet_edge(self):
+        feet_pos_xy = ((self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices, :2] + self.terrain.cfg.border_size) / self.cfg.terrain.horizontal_scale).round().long()  # (num_envs, 4, 2)
+        feet_pos_xy[..., 0] = torch.clip(feet_pos_xy[..., 0], 0, self.x_edge_mask.shape[0]-1)
+        feet_pos_xy[..., 1] = torch.clip(feet_pos_xy[..., 1], 0, self.x_edge_mask.shape[1]-1)
+        feet_at_edge = self.x_edge_mask[feet_pos_xy[..., 0], feet_pos_xy[..., 1]]
+    
+        self.feet_at_edge = self.contact_filt & feet_at_edge
+        rew = (self.terrain_levels > 3) * torch.sum(self.feet_at_edge, dim=-1)
+        return rew
+
+    def _reward_high_knees_height(self):
+        # 取最大值相当于取了摆动退的值
+        knee_height_diff = torch.abs(self.knee_pos_in_body[..., 2].amax(dim=1) - self.cfg.rewards.high_knees_target)
+        rew = torch.exp(-knee_height_diff / self.cfg.rewards.tracking_sigma)
+        return rew #* (torch.abs(self.commands[:, 0]) > 0.2)
+    
+    def _reward_high_feet_height(self):
+        # 取最大值相当于取了摆动退的值
+        feet_height_diff = torch.abs(self.feet_pos_in_body[..., 2].amax(dim=1) - self.cfg.rewards.high_feet_target)
+        rew = torch.exp(-feet_height_diff / self.cfg.rewards.tracking_sigma)
+        return rew #* (torch.abs(self.commands[:, 0]) > 0.2)
+    
+    def _reward_base_height(self):
+        root_height = self.root_states[:, 2]
+        feet_height = self.feet_pos[:, :, 2]
+        
+        base_height = root_height - torch.mean(feet_height, dim=1)
+        # print("base height = ", base_height)
+        return torch.exp(-torch.abs(base_height - self.cfg.rewards.squat_height_target)/self.cfg.rewards.tracking_sigma)
+    
+    

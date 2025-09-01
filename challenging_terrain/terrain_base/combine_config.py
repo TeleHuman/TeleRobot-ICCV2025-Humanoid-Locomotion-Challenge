@@ -2,6 +2,7 @@ from .single_terrain import single_terrain
 from .config import terrain_config
 import numpy as np
 class combine_config:
+        first_stage = True  #True  # False
         single = [
                 single_terrain.parkour, #0
                 single_terrain.hurdle,#1
@@ -25,12 +26,18 @@ class combine_config:
         addition = [
                 [single[5],single[2],single[4],single[8]]
         ]
-
-        proportions = [
-                ("single", 5, 0.3),#
-                # ("addition", 0, 0.5),
-                # ("multiplication", 3, 0.4),
-        ]
+        if first_stage:
+                proportions = [
+                        ("single", 3, 0.3),#
+                        # ("addition", 0, 0.5),
+                        # ("multiplication", 3, 0.4),
+                ]
+        else:  # [NOTE] need to modify the terrain for competition. 
+                proportions = [
+                        ("single", 5, 0.3),#
+                        # ("addition", 0, 0.5),
+                        # ("multiplication", 3, 0.4),
+                ]
 
 class generator:
         def __init__(self, cfg: terrain_config) -> None:

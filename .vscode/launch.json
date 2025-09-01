@@ -1,0 +1,24 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "legged_gym/legged_gym/scripts/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--exptid=DEBUG",
+                "--device=cuda:0",
+                "--num_envs=12",
+                "--task=h1_2_fix",
+                "--no_wandb",
+                "--headless"
+            ]
+        }
+
+    ]
+}

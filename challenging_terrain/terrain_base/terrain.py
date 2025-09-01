@@ -114,7 +114,12 @@ class Terrain:
         
         selected_pair = random.choices(pairs, weights=normalized_weights, k=1)[0]
         terrain_type, index = selected_pair  
-        difficulty = np.random.uniform(0.7, 1)
+        # [NOTE] need to modify
+        if combine_config.first_stage:
+            difficulty = np.random.uniform(0.0, 0.0)
+        # else:
+        #     difficulty = np.random.uniform(0.5, 1.0)
+        
         if terrain_type == "single":
             terrain = generator.single_create(terrain,index,difficulty)
         elif terrain_type == "multiplication":
@@ -122,7 +127,9 @@ class Terrain:
         elif terrain_type == "addition":
             terrain = generator.addition_create(terrain,index,difficulty)
         
-        self.add_roughness(terrain,difficulty)
+
+        roughness_difficulty = np.random.uniform(0.5, 1.0)
+        self.add_roughness(terrain,roughness_difficulty)
         return terrain
 
     def add_terrain_to_map(self, terrain, row, col):
