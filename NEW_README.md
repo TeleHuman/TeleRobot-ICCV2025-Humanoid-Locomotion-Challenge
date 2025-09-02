@@ -8,7 +8,7 @@ Refer to README.md
 
 ### Usage ###
 `cd legged_gym/scripts`
-1. Train first-stage base policy:  
+1. Train first-stage base policy (2000~3000 iters):  
 DO set the first-stage in the repo to True
 ![alt text](image.png)
 ![alt text](image-1.png)
