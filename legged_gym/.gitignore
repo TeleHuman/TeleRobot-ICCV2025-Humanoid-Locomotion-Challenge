@@ -15,8 +15,16 @@ wandb/
 # Compiled Python bytecode
 *.py[cod]
 
-# Log files
-*.log
+
+# logs 
+logs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# VSCode settings
+.vscode/
 
 # Package files
 *.jar

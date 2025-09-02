@@ -72,7 +72,7 @@ class H1_2FixCfg( LeggedRobotCfg ):
         n_proprio = 51 
         history_len = 10
         num_observations = n_proprio + n_scan + history_len*n_proprio + n_priv_latent + n_priv 
-        num_privileged_obs = num_observations # + 4
+        num_privileged_obs = num_observations  + 4
         num_actions = 12
         env_spacing = 3.
 
@@ -140,7 +140,7 @@ class H1_2FixCfg( LeggedRobotCfg ):
             lin_vel_y = [0.0, 0.0]
             ang_vel_yaw = [0, 0]
             heading = [0, 0]
-        cycletime = 0.02 * 40 # frequence * frames
+        cycletime = 0.02 * 50 # frequence * frames
 
     class rewards(LeggedRobotCfg.rewards):
         min_dist = 0.2
@@ -198,8 +198,6 @@ class H1_2FixCfg( LeggedRobotCfg ):
                 feet_lateral_distance = 0.5 # 2 # 0.5
                 # feet_slippage = -0.25
                 # feet_contact_force = -2.5e-4
-                # feet_distance = 0.2
-                # knee_distance = 0.2
                 
                 collision = -10.
                 feet_stumble = -1.5 

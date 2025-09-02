@@ -18,6 +18,19 @@
                 "--no_wandb",
                 "--headless"
             ]
+        },
+
+        {
+            "name": "Play",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "legged_gym/legged_gym/scripts/play.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--exptid=Sep02_08-21-21--h1_2_fix_first_stage_ct1.0",
+                "--task=h1_2_fix",
+
+            ]
         }
 
     ]

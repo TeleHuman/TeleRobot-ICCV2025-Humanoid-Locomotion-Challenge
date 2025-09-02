@@ -601,11 +601,11 @@ class HumanoidRobot(BaseTask):
             ], dim=1)
         )
 
-        # self.privileged_obs_buf = torch.cat([
-        #         self.obs_buf,
-        #         stance_mask,
-        #         contact_mask,
-        #     ], dim=1)    
+        self.privileged_obs_buf = torch.cat([
+                self.obs_buf,
+                stance_mask,
+                contact_mask,
+            ], dim=1)    
 
 
     def get_noisy_measurement(self, x, scale):
