@@ -31,7 +31,7 @@
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
 
-first_stage = True  #False #True
+first_stage = False  #False #True
 
 class H1_2FixCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
