@@ -1553,7 +1553,7 @@ class HumanoidRobot(BaseTask):
         feet_at_edge = self.x_edge_mask[feet_pos_xy[..., 0], feet_pos_xy[..., 1]]
     
         self.feet_at_edge = self.contact_filt & feet_at_edge
-        rew = (self.terrain_levels > 3) * torch.sum(self.feet_at_edge, dim=-1)
+        rew = (self.terrain_levels > 1) * torch.sum(self.feet_at_edge, dim=-1)
         return rew
 
     def _reward_high_knees_height(self):
