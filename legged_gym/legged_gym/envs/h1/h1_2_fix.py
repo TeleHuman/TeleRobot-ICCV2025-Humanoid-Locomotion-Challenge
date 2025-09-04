@@ -207,8 +207,8 @@ class H1_2FixCfg( LeggedRobotCfg ):
                 feet_edge = -1.0
 
                 # encourage higher 
-                high_knees_height = 2
-                high_feet_height = 2
+                high_knees_height =  0 # 2
+                high_feet_height = 0 #  2
                 base_height = 2.0
 
             
