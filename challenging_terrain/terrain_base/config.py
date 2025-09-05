@@ -31,8 +31,8 @@ class terrain_config:
         terrain_length = 10 # [NOTE] more steps scenario 20 #10.
         terrain_width = 4.
         platform_size = 2.5
-        num_rows= 20 #20 #10 # [NOTE] number of terrain rows (levels)  # spreaded is benifitiall !
-        num_cols = 10 #10 #20 # [NOTE] number of terrain cols (types)
+        num_rows= 10 #20 #20 #10 # [NOTE] number of terrain rows (levels)  # spreaded is benifitiall !
+        num_cols = 20 #10 #10 #20 # [NOTE] number of terrain cols (types)
 
         num_goals = 10 # [NOTE] more steps scenario 20 #10
 
