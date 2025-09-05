@@ -236,7 +236,7 @@ class single_terrain:
                 start_y = 0,
                 platform_size=1.0, 
                 difficulty = 0.5,
-                height_range=[0.15, 0.36], #[0.1,0.2],
+                height_range=[0.15, 0.35], #[0.1,0.2],
                 size_range=[0.5,0.6]#[0.5,0.6]
                 ):
         # length_y = 8

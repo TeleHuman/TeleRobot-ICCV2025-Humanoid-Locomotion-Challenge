@@ -33,7 +33,7 @@ import os
 
 from legged_gym.envs import *
 from legged_gym.utils import  get_args,  task_registry
-from terrain_base.config import terrain_config
+# from terrain_base.config import terrain_config
 
 import torch
 import faulthandler

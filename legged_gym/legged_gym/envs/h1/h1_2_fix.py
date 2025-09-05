@@ -31,7 +31,7 @@
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
 
-first_stage = False  #False #True
+first_stage = False #False #True
 
 class H1_2FixCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
@@ -195,7 +195,7 @@ class H1_2FixCfg( LeggedRobotCfg ):
                 # dof_pos_limits = -2.0
                 # dof_vel_limits = -1.0
                 # torque_limits = -1.0
-                feet_lateral_distance = 0.5 # 2 # 0.5
+                
                 # feet_slippage = -0.25
                 # feet_contact_force = -2.5e-4
                 
@@ -204,13 +204,13 @@ class H1_2FixCfg( LeggedRobotCfg ):
                 action_rate = -0.01
                 # feet_contact_number = 0.0 
 
-                feet_edge = -1.0
+                feet_edge = -5.0
 
                 # encourage higher 
-                high_knees_height =  0 # 2
-                high_feet_height = 0 #  2
+                high_knees_height = 2
+                high_feet_height = 2
                 base_height = 2.0
-
+                feet_lateral_distance = 0.5 
             
 
         only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
