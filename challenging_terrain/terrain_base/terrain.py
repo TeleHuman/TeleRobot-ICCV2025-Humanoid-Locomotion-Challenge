@@ -130,7 +130,7 @@ class Terrain:
 
         if not combine_config.first_stage:
             roughness_difficulty = np.random.uniform(0.5, 1.0)
-            self.add_roughness(terrain,roughness_difficulty)
+            # self.add_roughness(terrain,roughness_difficulty)
         return terrain
 
     def add_terrain_to_map(self, terrain, row, col):

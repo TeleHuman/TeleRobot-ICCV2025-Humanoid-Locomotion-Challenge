@@ -471,8 +471,8 @@ class OnPolicyRunner:
                                 locs['it'])
             self.writer.add_scalar('Train/mean_reward_entropy', statistics.mean(locs['rew_entropy_buffer']), locs['it'])
             self.writer.add_scalar('Train/mean_episode_length', statistics.mean(locs['lenbuffer']), locs['it'])
-
-
+            # self.writer.add_scalar('Train/mean_terrain_levels', statistics.mean(locs['terrain_l   evels']), locs['it'])
+            # print("locs keys: ", locs.keys())
 
         str = f" \033[1m Learning iteration {locs['it']}/{self.current_learning_iteration + locs['num_learning_iterations']} \033[0m "
 
