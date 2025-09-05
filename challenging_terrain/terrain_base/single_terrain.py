@@ -237,7 +237,7 @@ class single_terrain:
                 platform_size=1.0, 
                 difficulty = 0.5,
                 height_range=[0.15, 0.35], #[0.1,0.2],
-                size_range=[0.5,0.6]#[0.5,0.6]
+                size_range=[0.4,0.6]#[0.5,0.6]
                 ):
         # length_y = 8
         goals = np.zeros((num_goals, 2))
