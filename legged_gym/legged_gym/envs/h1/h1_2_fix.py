@@ -207,10 +207,10 @@ class H1_2FixCfg( LeggedRobotCfg ):
                 feet_edge = -5.0
 
                 # encourage higher 
-                high_knees_height = 2
-                high_feet_height = 2
-                base_height = 2.0
-                feet_lateral_distance = 0.5 
+                # high_knees_height = 2
+                # high_feet_height = 2
+                # base_height = 2.0
+                # feet_lateral_distance = 0.5 
             
 
         only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
