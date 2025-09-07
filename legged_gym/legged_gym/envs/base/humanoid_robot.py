@@ -808,6 +808,8 @@ class HumanoidRobot(BaseTask):
         if self.custom_origins:
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
+            # print("env_origins = ", self.env_origins)
+            # print("root_states = ", self.root_states[:, :3])
             if self.cfg.env.randomize_start_pos:
                 self.root_states[env_ids, :2] += torch_rand_float(-0.3, 0.3, (len(env_ids), 2), device=self.device) # xy position within 1m of the center
             if self.cfg.env.randomize_start_yaw:
@@ -857,7 +859,7 @@ class HumanoidRobot(BaseTask):
         # print("terrain level = ", self.terrain_levels)
         # # Robots that solve the last level are sent to a random one
         self.terrain_levels[env_ids] = torch.where(self.terrain_levels[env_ids]>=self.max_terrain_level,
-                                                   torch.randint_like(0, self.max_terrain_level),
+                                                   torch.randint_like(torch.zeros_like(self.terrain_levels[env_ids]), self.max_terrain_level),
                                                    torch.clip(self.terrain_levels[env_ids], 0)) # (the minumum level is zero)
         
         self.env_class[env_ids] = self.terrain_class[self.terrain_levels[env_ids], self.terrain_types[env_ids]]
@@ -955,7 +957,7 @@ class HumanoidRobot(BaseTask):
                 if self.cfg.control.control_type in ["P", "V"]:
                     print(f"PD gain of joint {name} were not defined, setting them to zero")
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
-
+        print("default_dof_pos = ", self.default_dof_pos)
         self.default_dof_pos_all[:] = self.default_dof_pos[0]
 
         self.height_update_interval = 1
@@ -1094,16 +1096,17 @@ class HumanoidRobot(BaseTask):
         self.num_dofs = len(self.dof_names)
         feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
         knee_names = [s for s in body_names if self.cfg.asset.knee_name in s]
-        
+        print("feet name         =", feet_names)
         penalized_contact_names = []
         for name in self.cfg.asset.penalize_contacts_on:
             penalized_contact_names.extend([s for s in body_names if name in s])
         termination_contact_names = []
         for name in self.cfg.asset.terminate_after_contacts_on:
             termination_contact_names.extend([s for s in body_names if name in s])
-
+        # import ipdb; ipdb.set_trace()
         base_init_state_list = self.cfg.init_state.pos + self.cfg.init_state.rot + self.cfg.init_state.lin_vel + self.cfg.init_state.ang_vel
         self.base_init_state = to_torch(base_init_state_list, device=self.device, requires_grad=False)
+        print("pos = ", self.base_init_state)
         start_pose = gymapi.Transform()
         start_pose.p = gymapi.Vec3(*self.base_init_state[:3])
 
@@ -1523,7 +1526,9 @@ class HumanoidRobot(BaseTask):
     def _reward_feet_contact_number(self):
         contact = self.contact_forces[:, self.feet_indices, 2] > 5
         stance_mask = self._get_gait_phase()
-        reward = torch.where(contact == stance_mask, 1.0, -0.4)
+        # print("contact = ", contact)
+        # print("stance_mask = ", stance_mask)
+        reward = torch.where(contact == stance_mask, 1.0, -1.0)
         return torch.mean(reward, dim=1)
     
     def _reward_feet_stumble(self):
@@ -1536,6 +1541,11 @@ class HumanoidRobot(BaseTask):
     def _reward_hip_joint_deviation(self):
         return torch.square(torch.norm(torch.abs(self.dof_pos[:, [0, 2, 6, 8]]), dim=1))
     
+    def _reward_g1_hip_joint_deviation(self):
+        return torch.square(torch.norm(torch.abs(self.dof_pos[:, [1, 2, 7, 8]]), dim=1))
+    
+    def _reward_gr1_hip_joint_deviation(self):
+        return torch.square(torch.norm(torch.abs(self.dof_pos[:, [1, 2, 7, 8]]), dim=1))
 
     def _reward_feet_lateral_distance(self):
         # Penalize feet lateral distance

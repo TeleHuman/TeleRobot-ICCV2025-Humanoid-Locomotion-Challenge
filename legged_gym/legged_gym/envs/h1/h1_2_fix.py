@@ -140,7 +140,7 @@ class H1_2FixCfg( LeggedRobotCfg ):
             lin_vel_y = [0.0, 0.0]
             ang_vel_yaw = [0, 0]
             heading = [0, 0]
-        cycletime = 0.02 * 50 # frequence * frames
+        cycletime = 0.02 * 50 # frequence * frames  # 50
 
     class rewards(LeggedRobotCfg.rewards):
         min_dist = 0.2

@@ -23,6 +23,7 @@ logs/
 __pycache__/
 *.pyc
 
+
 # VSCode settings
 .vscode/
 

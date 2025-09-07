@@ -27,7 +27,7 @@ class terrain_config:
         measured_points_y = [-0.75, -0.6, -0.45, -0.3, -0.15, 0., 0.15, 0.3, 0.45, 0.6, 0.75]
         measure_horizontal_noise = 0.0
 
-        max_init_terrain_level = 4 # starting curriculum state
+        max_init_terrain_level = 0 # starting curriculum state
         terrain_length = 10 # [NOTE] more steps scenario 20 #10.
         terrain_width = 4.
         platform_size = 2.5

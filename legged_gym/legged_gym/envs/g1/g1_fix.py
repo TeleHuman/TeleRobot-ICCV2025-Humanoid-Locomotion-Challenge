@@ -30,22 +30,26 @@
 
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
+first_stage=True
+
 class G1FixCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
-        pos = [0.0, 0.0, 0.80]  # x,y,z [m]
+
+        pos = [0.0, 0.0, 0.78]  # x,y,z [m]
+        
         default_joint_angles = { # = target angles [rad] when action = 0.0
-           '0_left_hip_yaw_joint' : 0. ,
-           '0_left_hip_roll_joint' : 0,
-           '0_left_hip_pitch_joint' : -0.1,
-           '0_left_knee_joint' : 0.3,
-           '0_left_ankle_pitch_joint' : -0.2,
-           '0_left_ankle_roll_joint' : 0,
-           '0_right_hip_yaw_joint' : 0.,
-           '0_right_hip_roll_joint' : 0,
-           '0_right_hip_pitch_joint' : -0.1,
-           '0_right_knee_joint' : 0.3,
-           '0_right_ankle_pitch_joint': -0.2,
-           '0_right_ankle_roll_joint' : 0,
+           'left_hip_yaw_joint' : 0. ,
+           'left_hip_roll_joint' : 0,
+           'left_hip_pitch_joint' : -0.1,
+           'left_knee_joint' : 0.3,
+           'left_ankle_pitch_joint' : -0.2,
+           'left_ankle_roll_joint' : 0,
+           'right_hip_yaw_joint' : 0.,
+           'right_hip_roll_joint' : 0,
+           'right_hip_pitch_joint' : -0.1,
+           'right_knee_joint' : 0.3,
+           'right_ankle_pitch_joint': -0.2,
+           'right_ankle_roll_joint' : 0,
         }
 
     class env( LeggedRobotCfg.env ):
@@ -92,7 +96,7 @@ class G1FixCfg( LeggedRobotCfg ):
         decimation = 4
 
     class asset( LeggedRobotCfg.asset ):
-        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/g1/g1_12dof.urdf'
+        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/g1/g1_12dof_with_hand.urdf'
         name = "g1_fix_upper"
         foot_name = "ankle_roll"
         knee_name = "knee"
@@ -107,52 +111,76 @@ class G1FixCfg( LeggedRobotCfg ):
             lin_vel_y = [0.0, 0.0]   # min max [m/s]
             ang_vel_yaw = [0, 0]    # min max [rad/s]
             heading = [0, 0]
-        cycletime = 0.02 * 50 # frequence * frames
+        cycletime = 0.02 * 40 # frequence * frames
 
   
     class rewards:
+        min_dist = 0.2
+        max_dist = 0.40
+        # high_knees_target = -0.20 # 0.75 - 0.95
+        # high_feet_target = -0.45  # 0.50 - 0.95
+        # squat_height_target = 0.82 # h1: 0.75
+        feet_min_lateral_distance_target = 0.22 # [h1] 0.22   # [g1]0.17 
         class scales:
-            # [NOTE]  first stage
-            termination = -0.0
-            # tracking_lin_vel = 2.0
-            # tracking_ang_vel = 0.8
-            tracking_goal_vel = 1.5
-            tracking_yaw = 0.7
-            lin_vel_z = -2.0
-            ang_vel_xy = -0.05
-            orientation = -2.0
-            torques = -0.00001
-            dof_vel = -1e-3 # -0.
-            dof_acc = -2.5e-7
-            base_height = -0. 
-            feet_air_time =  1.0
-            collision = -1.
-            feet_stumble = -1.0 
-            action_rate = -0.01
-            stand_still = -0.
-            feet_contact_number = 2.0 
+            if first_stage:
+                # [NOTE]  first stage
+                termination = -0.0
+                # tracking_lin_vel = 2.0
+                # tracking_ang_vel = 0.8
+                tracking_goal_vel = 2.5#1.5
+                tracking_yaw = 1.2 # 0.7
+                lin_vel_z = -2.0
+                ang_vel_xy = -0.05
+                orientation = -2.0
+                torques = -0.00001
+                dof_vel = -1e-3 # -0.
+                dof_acc = -2.5e-7
+                base_height = -0. 
+                feet_air_time =  5.0
+                collision = -1.
+                feet_stumble = -1.0 
+                action_rate = -0.01
+                g1_hip_joint_deviation = -1.2
+
+                feet_contact_number = 4.0 
+                # feet_distance = 0.2
+                # knee_distance = 0.2
 
             ######################
+            if not first_stage:
+                termination = -0.0
+                tracking_goal_vel = 1.5
+                tracking_yaw = 0.7
+                lin_vel_z = -0.5
+                ang_vel_xy = -0.05
+                orientation = -2.0
+                torques = -0.00001
+                # dof_vel = -1e-3 # -0.
+                dof_acc = -2.5e-8
+                base_height = -0. 
+                # feet_air_time =  1.0
 
-            # # [NOTE]  second stage
-            # termination = -0.0
-            # # tracking_lin_vel = 2.0
-            # # tracking_ang_vel = 0.8
-            # tracking_goal_vel = 1.5
-            # tracking_yaw = 0.7
-            # lin_vel_z = -0.5
-            # ang_vel_xy = -0.05
-            # orientation = -2.0
-            # torques = -0.00001
-            # dof_vel = -1e-3 # -0.
-            # dof_acc = -2.5e-7
-            # base_height = -0. 
-            # feet_air_time =  1.0
-            # collision = -1.
-            # feet_stumble = -1.0 
-            # action_rate = -0.01
-            # stand_still = -0.
-            # feet_contact_number = 0.0 
+
+                g1_hip_joint_deviation = -0.5
+                # dof_pos_limits = -2.0
+                # dof_vel_limits = -1.0
+                # torque_limits = -1.0
+                
+                # feet_slippage = -0.25
+                # feet_contact_force = -2.5e-4
+                
+                collision = -10.
+                feet_stumble = -1.5 
+                action_rate = -0.01
+                # feet_contact_number = 0.0 
+
+                feet_edge = -1.0
+
+                # encourage higher 
+                # high_knees_height = 2
+                # high_feet_height = 2
+                # base_height = 2.0
+                # feet_lateral_distance = 0.5 # 2 # 0.5
 
         only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25 # tracking reward = exp(-error^2/sigma)
