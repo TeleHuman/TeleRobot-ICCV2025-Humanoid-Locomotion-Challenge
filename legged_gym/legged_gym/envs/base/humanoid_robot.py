@@ -1545,7 +1545,8 @@ class HumanoidRobot(BaseTask):
         return torch.square(torch.norm(torch.abs(self.dof_pos[:, [1, 2, 7, 8]]), dim=1))
     
     def _reward_gr1_hip_joint_deviation(self):
-        return torch.square(torch.norm(torch.abs(self.dof_pos[:, [1, 2, 7, 8]]), dim=1))
+        # roll, yaw, pitch
+        return torch.square(torch.norm(torch.abs(self.dof_pos[:, [0, 1, 6, 7]]), dim=1))
 
     def _reward_feet_lateral_distance(self):
         # Penalize feet lateral distance
