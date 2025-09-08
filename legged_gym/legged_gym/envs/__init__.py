@@ -41,5 +41,5 @@ from legged_gym.utils.task_registry import task_registry
 
 # task_registry.register("h1_2_fix", HumanoidRobot, H1_2FixCfg(), H1_2FixCfgPPO())
 task_registry.register("g1", HumanoidRobot, G1FixCfg(), G1FixCfgPPO())
-# task_registry.register("gr1", HumanoidRobot, GR1FixCfg(), GR1FixCfgPPO())
+task_registry.register("gr1", HumanoidRobot, GR1FixCfg(), GR1FixCfgPPO())
 # task_registry.register("n1", HumanoidRobot, N1FixCfg(), N1FixCfgPPO())

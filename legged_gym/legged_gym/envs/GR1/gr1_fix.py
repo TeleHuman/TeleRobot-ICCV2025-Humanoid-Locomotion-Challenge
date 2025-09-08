@@ -129,16 +129,16 @@ class GR1FixCfg( LeggedRobotCfg ):
                 ang_vel_xy = -0.05
                 orientation = -2.0
                 torques = -0.00001
-                dof_vel = -1e-3 # -0.
+                # dof_vel = -1e-3 # -0.
                 dof_acc = -2.5e-7
                 base_height = -0. 
-                feet_air_time =  5.0
+                feet_air_time =  1.0
                 collision = -1.
                 feet_stumble = -1.0 
                 action_rate = -0.01
-                gr1_hip_joint_deviation = -1.2
+                # gr1_hip_joint_deviation = -1.2
 
-                feet_contact_number = 4.0 
+                feet_contact_number = 2.0 
                 # feet_distance = 0.2
                 # knee_distance = 0.2
 
