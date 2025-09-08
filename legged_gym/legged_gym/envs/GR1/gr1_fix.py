@@ -30,7 +30,7 @@
 
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
-first_stage=True
+first_stage=False
 
 class GR1FixCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):

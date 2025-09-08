@@ -2,7 +2,7 @@ from .single_terrain import single_terrain
 from .config import terrain_config
 import numpy as np
 class combine_config:
-        first_stage = True #False # True
+        first_stage = False #False # True
         single = [
                 single_terrain.parkour, #0
                 single_terrain.hurdle,#1
