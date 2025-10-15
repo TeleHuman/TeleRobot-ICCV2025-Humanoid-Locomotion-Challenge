@@ -143,6 +143,7 @@ class PPO:
         if self.actor_critic.is_recurrent:
             self.transition.hidden_states = self.actor_critic.get_hidden_states()
         # Compute the actions and values, use proprio to compute estimated priv_states then actions, but store true priv_states
+        # import ipdb; ipdb.set_trace()
         if self.train_with_estimated_states:
             obs_est = obs.clone()
             priv_states_estimated = self.estimator(obs_est[:, :self.num_prop])
@@ -204,20 +205,20 @@ class PPO:
                 entropy_batch = self.actor_critic.entropy
                 
                 # Adaptation module update
-                priv_latent_batch = self.actor_critic.actor.infer_priv_latent(obs_batch)
-                with torch.inference_mode():
-                    hist_latent_batch = self.actor_critic.actor.infer_hist_latent(obs_batch)
-                priv_reg_loss = (priv_latent_batch - hist_latent_batch.detach()).norm(p=2, dim=1).mean()
+                # priv_latent_batch = self.actor_critic.actor.infer_priv_latent(obs_batch)
+                # with torch.inference_mode():
+                #     hist_latent_batch = self.actor_critic.actor.infer_hist_latent(obs_batch)
+                # priv_reg_loss = (priv_latent_batch - hist_latent_batch.detach()).norm(p=2, dim=1).mean()
                 priv_reg_stage = min(max((self.counter - self.priv_reg_coef_schedual[2]), 0) / self.priv_reg_coef_schedual[3], 1)
                 priv_reg_coef = priv_reg_stage * (self.priv_reg_coef_schedual[1] - self.priv_reg_coef_schedual[0]) + self.priv_reg_coef_schedual[0]
 
                 # Estimator
-                priv_states_predicted = self.estimator(obs_batch[:, :self.num_prop])  # obs in batch is with true priv_states
-                estimator_loss = (priv_states_predicted - obs_batch[:, self.num_prop+self.num_scan:self.num_prop+self.num_scan+self.priv_states_dim]).pow(2).mean()
-                self.estimator_optimizer.zero_grad()
-                estimator_loss.backward()
-                nn.utils.clip_grad_norm_(self.estimator.parameters(), self.max_grad_norm)
-                self.estimator_optimizer.step()
+                # priv_states_predicted = self.estimator(obs_batch[:, :self.num_prop])  # obs in batch is with true priv_states
+                # estimator_loss = (priv_states_predicted - obs_batch[:, self.num_prop+self.num_scan:self.num_prop+self.num_scan+self.priv_states_dim]).pow(2).mean()
+                # self.estimator_optimizer.zero_grad()
+                # estimator_loss.backward()
+                # nn.utils.clip_grad_norm_(self.estimator.parameters(), self.max_grad_norm)
+                # self.estimator_optimizer.step()
                 
                 # KL
                 if self.desired_kl != None and self.schedule == 'adaptive':
@@ -254,8 +255,8 @@ class PPO:
 
                 loss = surrogate_loss + \
                        self.value_loss_coef * value_loss - \
-                       self.entropy_coef * entropy_batch.mean() + \
-                       priv_reg_coef * priv_reg_loss
+                       self.entropy_coef * entropy_batch.mean() 
+                    #    priv_reg_coef * priv_reg_loss
                 # loss = self.teacher_alpha * imitation_loss + (1 - self.teacher_alpha) * loss
 
                 # Gradient step
@@ -266,21 +267,21 @@ class PPO:
 
                 mean_value_loss += value_loss.item()
                 mean_surrogate_loss += surrogate_loss.item()
-                mean_estimator_loss += estimator_loss.item()
-                mean_priv_reg_loss += priv_reg_loss.item()
+                # mean_estimator_loss += estimator_loss.item()
+                # mean_priv_reg_loss += priv_reg_loss.item()
                 mean_discriminator_loss += 0
                 mean_discriminator_acc += 0
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_value_loss /= num_updates
         mean_surrogate_loss /= num_updates
-        mean_estimator_loss /= num_updates
+        # mean_estimator_loss /= num_updates
         mean_priv_reg_loss /= num_updates
         mean_discriminator_loss /= num_updates
         mean_discriminator_acc /= num_updates
         self.storage.clear()
         self.update_counter()
-        return mean_value_loss, mean_surrogate_loss, mean_estimator_loss, mean_discriminator_loss, mean_discriminator_acc, mean_priv_reg_loss, priv_reg_coef
+        return mean_value_loss, mean_surrogate_loss, mean_discriminator_loss, mean_discriminator_acc, mean_priv_reg_loss, priv_reg_coef
 
     def update_dagger(self):
         mean_hist_latent_loss = 0
@@ -291,24 +292,25 @@ class PPO:
         for obs_batch, critic_obs_batch, actions_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch, \
             old_mu_batch, old_sigma_batch, hid_states_batch, masks_batch in generator:
                 with torch.inference_mode():
-                    self.actor_critic.act(obs_batch, hist_encoding=True, masks=masks_batch, hidden_states=hid_states_batch[0])
+                    self.actor_critic.act(obs_batch, hist_encoding=False, masks=masks_batch, hidden_states=hid_states_batch[0])
 
                 # Adaptation module update
                 with torch.inference_mode():
                     priv_latent_batch = self.actor_critic.actor.infer_priv_latent(obs_batch)
-                hist_latent_batch = self.actor_critic.actor.infer_hist_latent(obs_batch)
-                hist_latent_loss = (priv_latent_batch.detach() - hist_latent_batch).norm(p=2, dim=1).mean()
-                self.hist_encoder_optimizer.zero_grad()
-                hist_latent_loss.backward()
+                # hist_latent_batch = self.actor_critic.actor.infer_hist_latent(obs_batch)
+                # hist_latent_loss = (priv_latent_batch.detach() - hist_latent_batch).norm(p=2, dim=1).mean()
+                # self.hist_encoder_optimizer.zero_grad()
+                # hist_latent_loss.backward()
                 nn.utils.clip_grad_norm_(self.actor_critic.actor.history_encoder.parameters(), self.max_grad_norm)
                 self.hist_encoder_optimizer.step()
                 
-                mean_hist_latent_loss += hist_latent_loss.item()
+                # mean_hist_latent_loss += hist_latent_loss.item()
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_hist_latent_loss /= num_updates
         self.storage.clear()
         self.update_counter()
-        return mean_hist_latent_loss
+        
+        # return mean_hist_latent_loss
 
     def update_depth_encoder(self, depth_latent_batch, scandots_latent_batch):
         # Depth encoder ditillation

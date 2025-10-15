@@ -58,6 +58,7 @@ class RolloutStorage:
         self.actions_shape = actions_shape
 
         # Core
+        # import ipdb; ipdb.set_trace()
         self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape, device=self.device)
 
         if privileged_obs_shape[0] is not None:

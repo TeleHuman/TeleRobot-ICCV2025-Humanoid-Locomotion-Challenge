@@ -1,0 +1,64 @@
+Timer unit: 1e-09 s
+
+Total time: 10.5205 s
+File: /home/lxz/ICCV2025-Challenge/challenging_terrain/terrain_base/terrain.py
+Function: __init__ at line 42
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    42                                               @profile
+    43                                               def __init__(self, num_robots) -> None:
+    44         1        690.0    690.0      0.0          cfg = terrain_config
+    45         1       2277.0   2277.0      0.0          self.cfg = terrain_config
+    46         1        618.0    618.0      0.0          self.num_robots = num_robots
+    47         1       1148.0   1148.0      0.0          self.type = cfg.mesh_type
+    48         1       1266.0   1266.0      0.0          if self.type in ["none", 'plane']:
+    49                                                       return
+    50                                                   
+    51         1       2116.0   2116.0      0.0          self.env_length = cfg.terrain_length
+    52         1       3675.0   3675.0      0.0          self.env_width = cfg.terrain_width
+    53                                           
+    54         1       3218.0   3218.0      0.0          self.cfg.num_sub_terrains = cfg.num_rows * cfg.num_cols
+    55         1      11537.0  11537.0      0.0          self.env_origins = np.zeros((cfg.num_rows, cfg.num_cols, 3))
+    56         1       1626.0   1626.0      0.0          self.terrain_type = np.zeros((cfg.num_rows, cfg.num_cols))
+    57                                           
+    58         1      20556.0  20556.0      0.0          self.goals = np.zeros((cfg.num_rows, cfg.num_cols, cfg.num_goals, 3))
+    59         1        677.0    677.0      0.0          self.num_goals = cfg.num_goals
+    60         1       2133.0   2133.0      0.0          self.width_per_env_pixels = int(self.env_width / cfg.horizontal_scale)
+    61         1       1986.0   1986.0      0.0          self.length_per_env_pixels = int(self.env_length / cfg.horizontal_scale)
+    62         1       3123.0   3123.0      0.0          self.border = int(cfg.border_size/self.cfg.horizontal_scale)
+    63         1       2609.0   2609.0      0.0          self.tot_cols = int(cfg.num_cols * self.width_per_env_pixels) + 2 * self.border
+    64         1        488.0    488.0      0.0          self.tot_rows = int(cfg.num_rows * self.length_per_env_pixels) + 2 * self.border
+    65                                           
+    66         1      13821.0  13821.0      0.0          self.height_field_raw = np.zeros((self.tot_rows , self.tot_cols), dtype=np.int16)
+    67                                           
+    68         1        452.0    452.0      0.0          if self.type != "None":
+    69        11       3971.0    361.0      0.0              for j in range(self.cfg.num_cols):
+    70       310      46724.0    150.7      0.0                  for i in range(self.cfg.num_rows):
+    71       300      49812.0    166.0      0.0                      if cfg.curriculum:
+    72       300      58198.0    194.0      0.0                          difficulty = i / (self.cfg.num_rows)
+    73                                                               else:
+    74                                                                   difficulty=np.random.uniform(0, 1)
+    75       300    4532619.0  15108.7      0.0                      terrain = self.make_terrain(difficulty)
+    76       300    4565106.0  15217.0      0.0                      self.add_terrain_to_map(terrain, i, j)
+    77                                             
+    78         1       1257.0   1257.0      0.0          self.heightsamples = self.height_field_raw
+    79         2  310116388.0 1.55e+08      2.9          self.vertices, self.triangles, self.x_edge_mask = convert_heightfield_to_trimesh(   self.height_field_raw,
+    80         1        301.0    301.0      0.0                                                                                          self.cfg.horizontal_scale,
+    81         1        167.0    167.0      0.0                                                                                          self.cfg.vertical_scale,
+    82         1       5148.0   5148.0      0.0                                                                                          self.cfg.slope_treshold)
+    83         1       5247.0   5247.0      0.0          half_edge_width = int(self.cfg.edge_width_thresh / self.cfg.horizontal_scale)
+    84         1      34664.0  34664.0      0.0          structure = np.ones((half_edge_width*2+1, 1))
+    85         1   19864079.0 1.99e+07      0.2          self.x_edge_mask = binary_dilation(self.x_edge_mask, structure=structure)
+    86         1       3506.0   3506.0      0.0          if self.cfg.simplify_grid:
+    87         1      10350.0  10350.0      0.0              mesh_simplifier = pyfqmr.Simplify()
+    88         1 3151119394.0 3.15e+09     30.0              mesh_simplifier.setMesh(self.vertices, self.triangles)
+    89         1 6748426770.0 6.75e+09     64.1              mesh_simplifier.simplify_mesh(target_count = int(0.05*self.triangles.shape[0]), aggressiveness=7, preserve_border=True, verbose=10)
+    90         1  280391255.0  2.8e+08      2.7              self.vertices, self.triangles, normals = mesh_simplifier.getMesh()
+    91         1     531239.0 531239.0      0.0              self.vertices = self.vertices.astype(np.float32)
+    92         1     582559.0 582559.0      0.0              self.triangles = self.triangles.astype(np.uint32)
+    93                                           
+    94         1      72870.0  72870.0      0.0          print("Created {} vertices".format(self.vertices.shape[0]))
+    95         1      10211.0  10211.0      0.0          print("Created {} triangles".format(self.triangles.shape[0]))
+
+ 10.52 seconds - /home/lxz/ICCV2025-Challenge/challenging_terrain/terrain_base/terrain.py:42 - __init__

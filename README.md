@@ -1,14 +1,3 @@
-# [Multi-Terrain Humanoid Locomotion Challenge in Human-Robot-Scene Interaction and Collaboration (ICCV 2025 Workshop)](https://human-robot-scene.github.io/Terrain-Challenge/)
-
-![Workshop](images/workshop.png)
-
-## Introduction
-
-This package(challenging_terrain) contains 9 types of terrains (which will be continuously expanded in the future) and a large number of terrains arranged in various combinations. The basic module configuration code based on Legged Gym is provided, allowing users to achieve plug and play of terrain modules within their existing Legged Gym framework. 
-
-This code is compatible with various robots, including but not limited to humanoid robots such as Unitree G1, Unitree H1-2, Fourier GR1-T2, Fourier GRX-N1,which will be continuously added in the future. 
-
-Provided an online data collection module that can store trained policies in dataset format. The evaluation module is embedded in the code and only requires one parameter to quantitatively evaluate the trained policy indicators.
 
 ### Installation ###
 ```bash
@@ -28,26 +17,24 @@ pip install "numpy<1.24" pydelatin wandb tqdm opencv-python ipdb pyfqmr flask
 
 ### Usage ###
 `cd legged_gym/scripts`
-1. Train base policy:  
+
+1. Set both first_stage flag in combine_terrain.py & envs/{robot}/{robot}.py to __True__. Train 1st stage base policy on flat terrain(Robots are able to walk after around 1000 iterations.):  
+(We have released first stage base policy for all humanoid platforms.)
 ```
 python train.py --exptid h1-2 --device cuda:0 --headless --task h1_2_fix
 ```
 
-2. Training Recovery:
+2. Set bot first_stage falg to **False**. Training Recovery 2nd stage on multi-terrains:
 ```
-python train.py --exptid h1-2 --device cuda:0 --resume --resumeid=test --checkpoint=50000 --headless --task h1_2_fix
+python train.py --exptid h1-2 --device cuda:0 --resume --resumeid=test --checkpoint=1000--headless --task h1_2_fix
 ```
 
-3. Play base policy:
+3. Play the policy:
 ```
 python play.py --exptid test --task h1_2_fix
 ```
 
-4. record trace as dataset
 
-```
-python record_replay.py --exptid test --save
-```
 
 ### Arguments ###
 - --exptid: string,  to describe the run. 

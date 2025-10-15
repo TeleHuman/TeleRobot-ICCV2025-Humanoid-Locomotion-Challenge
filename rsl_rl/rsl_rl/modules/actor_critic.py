@@ -140,10 +140,13 @@ class Actor(nn.Module):
             self.scan_encoder_output_dim = num_scan
         
         actor_layers = []
+        # actor_layers.append(nn.Linear(num_prop+
+        #                               self.scan_encoder_output_dim+
+        #                               num_priv_explicit+
+        #                               priv_encoder_output_dim, 
+        #                               actor_hidden_dims[0]))
         actor_layers.append(nn.Linear(num_prop+
-                                      self.scan_encoder_output_dim+
-                                      num_priv_explicit+
-                                      priv_encoder_output_dim, 
+                                      self.scan_encoder_output_dim,
                                       actor_hidden_dims[0]))
         actor_layers.append(activation)
         for l in range(len(actor_hidden_dims)):
@@ -158,8 +161,10 @@ class Actor(nn.Module):
 
     def forward(self, obs, hist_encoding: bool, eval=False, scandots_latent=None):
         if not eval:
+            # import ipdb; ipdb.set_trace()
             if self.if_scan_encode:
-                obs_scan = obs[:, self.num_prop:self.num_prop + self.num_scan]
+                # obs_scan = obs[:, self.num_prop:self.num_prop + self.num_scan]
+                obs_scan = obs[:, self.num_prop:]
                 if scandots_latent is None:
                     scan_latent = self.scan_encoder(obs_scan)   
                 else:
@@ -167,12 +172,14 @@ class Actor(nn.Module):
                 obs_prop_scan = torch.cat([obs[:, :self.num_prop], scan_latent], dim=1)
             else:
                 obs_prop_scan = obs[:, :self.num_prop + self.num_scan]
-            obs_priv_explicit = obs[:, self.num_prop + self.num_scan:self.num_prop + self.num_scan + self.num_priv_explicit]
-            if hist_encoding:
-                latent = self.infer_hist_latent(obs)
-            else:
-                latent = self.infer_priv_latent(obs)
-            backbone_input = torch.cat([obs_prop_scan, obs_priv_explicit, latent], dim=1)
+            # obs_priv_explicit = obs[:, self.num_prop + self.num_scan:self.num_prop + self.num_scan + self.num_priv_explicit]
+            # if hist_encoding:
+            #     latent = self.infer_hist_latent(obs)
+            # else:
+            #     latent = self.infer_priv_latent(obs)
+            # backbone_input = torch.cat([obs_prop_scan, obs_priv_explicit, latent], dim=1)
+            backbone_input = obs_prop_scan #  torch.cat([obs_prop_scan], dim=1)
+
             backbone_output = self.actor_backbone(backbone_input)
             return backbone_output
         else:
@@ -234,6 +241,7 @@ class ActorCriticRMA(nn.Module):
 
         # Value function
         critic_layers = []
+        # import ipdb; ipdb.set_trace()
         critic_layers.append(nn.Linear(num_critic_obs, critic_hidden_dims[0]))
         critic_layers.append(activation)
         for l in range(len(critic_hidden_dims)):

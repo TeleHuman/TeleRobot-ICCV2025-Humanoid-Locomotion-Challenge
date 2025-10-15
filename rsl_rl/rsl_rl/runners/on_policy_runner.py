@@ -100,7 +100,7 @@ class OnPolicyRunner:
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
         self.dagger_update_freq = self.alg_cfg["dagger_update_freq"]
-
+        # import ipdb; ipdb.set_trace()
         self.alg.init_storage(
             self.env.num_envs, 
             self.num_steps_per_env, 
@@ -157,12 +157,12 @@ class OnPolicyRunner:
 
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
-            hist_encoding = it % self.dagger_update_freq == 0
-
+            # hist_encoding = it % self.dagger_update_freq == 0
+            hist_encoding = False 
             # Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
-                    actions = self.alg.act(obs, critic_obs, infos, hist_encoding)
+                    actions = self.alg.act(obs, critic_obs, infos, hist_encoding=False)
                     # start_t = time.time()
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)  # obs has changed to next_obs !! if done obs has been reset
                     # print("step time consumption: ", time.time()-start_t)
@@ -198,25 +198,28 @@ class OnPolicyRunner:
                 start = stop
                 self.alg.compute_returns(critic_obs)
             start_t = time.time()
-            mean_value_loss, mean_surrogate_loss, mean_estimator_loss, mean_disc_loss, mean_disc_acc, mean_priv_reg_loss, priv_reg_coef = self.alg.update()
+            mean_value_loss, mean_surrogate_loss, mean_disc_loss, mean_disc_acc, mean_priv_reg_loss, priv_reg_coef = self.alg.update()
             print("update time consumption: ", time.time()-start_t)
             if hist_encoding:
                 print("Updating dagger...")
-                mean_hist_latent_loss = self.alg.update_dagger()
+                self.alg.update_dagger()
             
             stop = time.time()
             learn_time = stop - start
             if self.log_dir is not None:
                 self.log(locals())
-            if it < 2500:
-                if it % self.save_interval == 0:
-                    self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
-            elif it < 5000:
-                if it % (2*self.save_interval) == 0:
-                    self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
-            else:
-                if it % (5*self.save_interval) == 0:
-                    self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+            if it % self.save_interval == 0:
+                self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+                
+            # if it < 2500:
+            #     if it % self.save_interval == 0:
+            #         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+            # elif it < 5000:
+            #     if it % (2*self.save_interval) == 0:
+            #         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+            # else:
+            #     if it % (5*self.save_interval) == 0:
+            #         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
             ep_infos.clear()
         
         # self.current_learning_iteration += num_learning_iterations
@@ -400,6 +403,7 @@ class OnPolicyRunner:
 
         ep_string = f''
         wandb_dict = {}
+        ep_string = f''
         if locs['ep_infos']:
             for key in locs['ep_infos'][0]:
                 infotensor = torch.tensor([], device=self.device)
@@ -411,7 +415,7 @@ class OnPolicyRunner:
                         ep_info[key] = ep_info[key].unsqueeze(0)
                     infotensor = torch.cat((infotensor, ep_info[key].to(self.device)))
                 value = torch.mean(infotensor)
-                wandb_dict['Episode_rew/' + key] = value
+                self.writer.add_scalar('Episode/' + key, value, locs['it'])
                 ep_string += f"""{f'Mean episode {key}:':>{pad}} {value:.4f}\n"""
         mean_std = self.alg.actor_critic.std.mean()
         fps = int(self.num_steps_per_env * self.env.num_envs / (locs['collection_time'] + locs['learn_time']))
@@ -471,7 +475,7 @@ class OnPolicyRunner:
                                 locs['it'])
             self.writer.add_scalar('Train/mean_reward_entropy', statistics.mean(locs['rew_entropy_buffer']), locs['it'])
             self.writer.add_scalar('Train/mean_episode_length', statistics.mean(locs['lenbuffer']), locs['it'])
-            # self.writer.add_scalar('Train/mean_terrain_levels', statistics.mean(locs['terrain_l   evels']), locs['it'])
+            # self.writer.add_scalar('Train/mean_terrain_levels', statistics.mean(locs["episode"]['terrain_level']), locs['it'])
             # print("locs keys: ", locs.keys())
 
         str = f" \033[1m Learning iteration {locs['it']}/{self.current_learning_iteration + locs['num_learning_iterations']} \033[0m "

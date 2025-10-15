@@ -30,9 +30,11 @@
 
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
+first_stage=False
+
 class N1FixCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
-        pos = [0.0, 0.0, 0.90]  # x,y,z [m]
+        pos = [0.0, 0.0, 0.72]  # x,y,z [m]
         default_joint_angles = { # = target angles [rad] when action = 0.0
             "left_hip_roll_joint": 0.,
             "left_hip_yaw_joint": 0.,
@@ -52,17 +54,18 @@ class N1FixCfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
         num_envs = 2048
         n_scan = 132
-        n_priv = 3 + 3 + 3 # = 9 base velocity 3个
-
-        n_priv_latent = 4 + 1 + 12 + 12 # mass, fraction, motor strength1 and 2
-        
-        n_proprio = 51 # 所有本体感知信息，即obs_buf
+        n_priv = 3 + 3 + 3 
+        n_priv_latent = 4 + 1 + 12 + 12 
+        n_proprio = 43+3 
+        n_proprio_priv = 49+12 
         history_len = 10
+        num_observations = n_proprio + n_scan 
+        # num_observations = n_proprio_priv + n_scan + history_len*n_proprio + n_priv_latent + n_priv 
 
-        # num obs = 53+132+10*53+43+9 = 187+47+530+43+9 = 816
-        num_observations = n_proprio + n_scan + history_len*n_proprio + n_priv_latent + n_priv #n_scan + n_proprio + n_priv #187 + 47 + 5 + 12 
+        num_privileged_obs = 839 #709 +4 # 4 for contact & stance mask  #731
+
         num_actions = 12
-        env_spacing = 3.  # not used with heightfields/trimeshes 
+        env_spacing = 3.
 
         contact_buf_len = 100
 
@@ -93,38 +96,86 @@ class N1FixCfg( LeggedRobotCfg ):
 
     class asset( LeggedRobotCfg.asset ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/N1/N1_rotor.urdf'
+        # file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/N1/N1_rotor_origin.urdf'
         name = "N1"
         foot_name = "foot_roll"
         knee_name = "shank"
         penalize_contacts_on = ["thigh", "shank"]
         terminate_after_contacts_on = ["base"]
-        self_collisions = 0 # 1 to disable, 0 to enable...bitwise filter
+        self_collisions = 1 # 1 to disable, 0 to enable...bitwise filter
         flip_visual_attachments = False
 
     class commands( LeggedRobotCfg.commands ):
         class ranges( LeggedRobotCfg.commands.ranges ):
-            lin_vel_x = [0.1, 0.6]  # min max [m/s]
+            lin_vel_x = [0.6, 0.8]  # min max [m/s]
             lin_vel_y = [0.0, 0.0]   # min max [m/s]
             ang_vel_yaw = [0, 0]    # min max [rad/s]
             heading = [0, 0]
+        cycletime = 0.02 * 40 # frequence * frames
+
 
     class rewards:
+        min_dist = 0.2
+        max_dist = 0.40
+        # high_knees_target = -0.20 # 0.75 - 0.95
+        # high_feet_target = -0.45  # 0.50 - 0.95
+        # squat_height_target = 0.82 # h1: 0.75
+        feet_min_lateral_distance_target = 0.22 # [h1] 0.22   # [g1]0.17 
         class scales:
-            termination = -0.0
-            tracking_lin_vel = 1.0
-            tracking_ang_vel = 0.5
-            lin_vel_z = -2.0
-            ang_vel_xy = -0.05
-            orientation = -0.
-            torques = -0.00001
-            dof_vel = -0.
-            dof_acc = -2.5e-7
-            base_height = -0. 
-            feet_air_time =  1.0
-            collision = -1.
-            feet_stumble = -0.0 
-            action_rate = -0.01
-            stand_still = -0.
+            if first_stage:
+                # [NOTE]  first stage
+                termination = -0.0
+                tracking_lin_vel = 2.0
+                tracking_ang_vel = 0.8
+                tracking_goal_vel = 5 # 15 # 1.5
+                tracking_yaw = 2 # 7 # 0.7
+                lin_vel_z = -2.0
+                ang_vel_xy = -0.05
+                orientation = -2.0
+                torques = -0.00001
+                dof_vel = -1e-3 # -0.
+                dof_acc = -2.5e-7
+                base_height = -0. 
+                feet_air_time =  1.0
+                collision = -1.
+                feet_stumble = -1.0 
+                action_rate = -0.01
+                n1_hip_joint_deviation = -2.0
+                stand_still = -0.
+                feet_contact_number = 2.0 
+                single_foot_contact = 2.0
+                # 先训练一个第一阶段的 -- 不要phase（priv的obs和rewards）*********** TODO
+                feet_distance = 0.2
+                knee_distance = 0.2
+
+                # feet_clearance = 1.0
+                joint_hip_pitch = 1.5
+                joint_knee = 1.5
+                joint_ankle_pitch = 0.8
+                # 约束脚踝不要过分运动
+                # ankle_torque = -1e-02 #-5e-6 #-5e-5
+                # ankle_action_rate = -0.02 #-0.005 #-0.02
+
+            ######################
+            if not first_stage:
+                termination = -0.0
+                tracking_lin_vel = 3.0
+                # tracking_goal_vel = 2.0 #2.5
+                tracking_yaw = 2.0 #1.2  
+                lin_vel_z = -0.5 
+                ang_vel_xy = -0.05 
+                orientation = -2.0
+                torques = -0.00001
+                dof_acc = -2.5e-8
+                # base_height = -0. 
+                n1_hip_joint_deviation = -0.8 /2 
+                collision = -10.
+                feet_stumble = -2.0
+                action_rate = -0.01
+                feet_edge = -3.0
+                stuck = -2.0
+
+    
 
         only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25 # tracking reward = exp(-error^2/sigma)
@@ -141,11 +192,11 @@ class N1FixCfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'n1_fix'
-        max_iterations = 50001 # number of policy updates
-        save_interval = 500
+        max_iterations = 1000001 # number of policy updates
+        save_interval = 100
 
     class estimator(LeggedRobotCfgPPO.estimator):
-        train_with_estimated_states = True
+        train_with_estimated_states = False
         learning_rate = 1.e-4
         hidden_dims = [128, 64]
         priv_states_dim = N1FixCfg.env.n_priv

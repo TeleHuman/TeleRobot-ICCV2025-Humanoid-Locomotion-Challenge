@@ -56,6 +56,7 @@ from tqdm import tqdm
 import cv2
 import matplotlib.pyplot as plt
 
+from line_profiler import profile
 
 class HumanoidRobot(BaseTask):
     def __init__(self, cfg: LeggedRobotCfg, sim_params, physics_engine, sim_device, headless, save):
@@ -146,6 +147,8 @@ class HumanoidRobot(BaseTask):
             stats['avg_episode_length'] = stats['total_samples'] / stats['total_episodes']
         return stats
 
+
+    @profile
     def step(self, actions):
         """ Apply actions, simulate, call self.post_physics_step()
 
@@ -279,7 +282,12 @@ class HumanoidRobot(BaseTask):
         self.cur_goal_idx[next_flag] += 1
         self.reach_goal_timer[next_flag] = 0
 
+
+        # [NOTE] update goal logic. 
         self.reached_goal_ids = torch.norm(self.root_states[:, :2] - self.cur_goals[:, :2], dim=1) < self.cfg.env.next_goal_threshold
+        # self.reached_goal_ids = (torch.norm(self.root_states[:, :2] - self.cur_goals[:, :2], dim=1) < 0.4) & (self.root_states[:,0] > self.cur_goals[:, 0])
+        
+        
         self.reach_goal_timer[self.reached_goal_ids] += 1
         # print("cur_goals = ", self.cur_goals)
         self.target_pos_rel = self.cur_goals[:, :2] - self.root_states[:, :2]
@@ -293,6 +301,7 @@ class HumanoidRobot(BaseTask):
         target_vec_norm = self.next_target_pos_rel / (norm + 1e-5)
         self.next_target_yaw = torch.atan2(target_vec_norm[:, 1], target_vec_norm[:, 0])
 
+    @profile
     def post_physics_step(self):
         """ check terminations, compute observations and rewards
             calls self._post_physics_step_callback() for common computations 
@@ -354,7 +363,8 @@ class HumanoidRobot(BaseTask):
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
             self.gym.clear_lines(self.viewer)
             # self._draw_height_samples()
-            self._draw_goals()
+            if terrain_config.mesh_type != 'None':
+                self._draw_goals()
             # self._draw_feet()
             if self.cfg.depth.use_camera:
                 window_name = "Depth Image"
@@ -373,15 +383,22 @@ class HumanoidRobot(BaseTask):
     def check_termination(self):
         """ Check if environments need to be reset
         """
-        # self.reset_buf = torch.zeros((self.num_envs, ), dtype=torch.bool, device=self.device)
-        self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1., dim=1)
-        roll_cutoff = torch.abs(self.roll) > 0.6  #1.5
-        pitch_cutoff = torch.abs(self.pitch) > 0.6 #1.5
+        self.reset_buf = torch.zeros((self.num_envs, ), dtype=torch.bool, device=self.device)
+        # self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1., dim=1)
+        # print("contact = ", self.reset_buf)
+        roll_cutoff = torch.abs(self.roll) > 0.7 #0.6  #1.5
+        pitch_cutoff = torch.abs(self.pitch) > 0.7 #0.6 #1.5
         reach_goal_cutoff = self.cur_goal_idx >= self.cfg.terrain.num_goals
         height_cutoff = self.root_states[:, 2] < 0.5
 
         self.time_out_buf = self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
         self.time_out_buf |= reach_goal_cutoff
+
+        # print("self.time_out_buf = ", self.time_out_buf)
+        # print("roll_cutoff = ", roll_cutoff)
+        # print("pitch_cutoff = ", pitch_cutoff)
+        # print("height_cutoff = ", height_cutoff)
+
 
         self.reset_buf |= self.time_out_buf
         self.reset_buf |= roll_cutoff
@@ -391,7 +408,7 @@ class HumanoidRobot(BaseTask):
         self.total_times += len(self.reset_buf.nonzero(as_tuple=False).flatten())
         self.success_times += len(reach_goal_cutoff.nonzero(as_tuple=False).flatten())
         self.complete_times += (self.cur_goal_idx[self.reset_buf.nonzero(as_tuple=False).flatten()] / self.cfg.terrain.num_goals).sum()
-
+    @profile
     def reset_idx(self, env_ids):
         """ Reset some environments.
             Calls self._reset_dofs(env_ids), self._reset_root_states(env_ids), and self._resample_commands(env_ids)
@@ -402,6 +419,8 @@ class HumanoidRobot(BaseTask):
         Args:
             env_ids (list[int]): List of environment ids which must be reset
         """
+        import time
+        start_time = time.time()
         if len(env_ids) == 0:
             return
         
@@ -483,15 +502,49 @@ class HumanoidRobot(BaseTask):
             self.episode_sums[key][env_ids] = 0.
         self.episode_length_buf[env_ids] = 0
 
+
+        unique_types = torch.unique(self.terrain_types)
+
+        # 计算每个类型的平均值
+        mean_levels = []
+        counts = []
+        # print("unique_types = ", unique_types)
+        for t in unique_types:
+            mask = self.terrain_types == t
+            mean = torch.mean(self.terrain_levels[mask].float())
+            count = torch.sum(mask).item()
+            mean_levels.append(mean.item())
+            counts.append(count)
+
+        count_result = dict(zip(unique_types.cpu().numpy(), counts))
+        print("count result = ", count_result)
+        # 创建结果字典
+        result = dict(zip(unique_types.cpu().numpy(), mean_levels))
+
+        # print(result)
+        # import ipdb; ipdb.set_trace()
         # log additional curriculum info
         if self.cfg.terrain.curriculum:
             # print("terrain level = ", self.terrain_levels, " mean  ", torch.mean(self.terrain_levels.float()))
             self.extras["episode"]["terrain_level"] = torch.mean(self.terrain_levels.float())
+            self.extras["episode"]["terrain_parkour_level"] = result[0]
+            self.extras["episode"]["terrain_hurdle_level"] = result[1]
+            self.extras["episode"]["terrain_bridge_level"] = result[2]
+            self.extras["episode"]["terrain_flat_level"] = result[3]
+            self.extras["episode"]["terrain_uneven_level"] = result[4]
+            self.extras["episode"]["terrain_stair_level"] = result[5]
+            self.extras["episode"]["terrain_wave_level"] = result[6]
+            self.extras["episode"]["terrain_slope_level"] = result[7]
+            self.extras["episode"]["terrain_gap_level"] = result[8]
+
         if self.cfg.commands.curriculum:
             self.extras["episode"]["max_command_x"] = self.command_ranges["lin_vel_x"][1]
         # send timeout info to the algorithm
         if self.cfg.env.send_timeouts:
             self.extras["time_outs"] = self.time_out_buf
+
+        end_time = time.time()
+        # print(f"Reset {len(env_ids)} envs, took {end_time - start_time:.3f} seconds")
         
     def compute_reward(self):
         """ Compute rewards
@@ -543,14 +596,16 @@ class HumanoidRobot(BaseTask):
         """
         self._get_phase()
 
-        stance_mask = self._get_gait_phase()
+        stance_mask = torch.zeros((self.num_envs, 2), device=self.device) # self._get_gait_phase()
         contact_mask = self.contact_forces[:, self.feet_indices, 2] > 5 
 
         imu_obs = torch.stack((self.roll, self.pitch), dim=1)
         if self.global_counter % 5 == 0:
             self.delta_yaw = self.target_yaw - self.yaw
             self.delta_next_yaw = self.next_target_yaw - self.yaw
-        obs_buf = torch.cat((#skill_vector, 
+
+
+        privileged_obs_buf = torch.cat((#skill_vector, 
                             self.base_ang_vel  * self.obs_scales.ang_vel,   #[1,3] # 3
                             imu_obs,    #[1,2]  2 只包含roll和pitch
                             0*self.delta_yaw[:, None], # 1
@@ -558,14 +613,40 @@ class HumanoidRobot(BaseTask):
                             self.delta_next_yaw[:, None],  # 1
                             0*self.commands[:, 0:2],  # 2
                             self.commands[:, 0:1],  #[1,1]  # 1
-                            (self.env_class != 17).float()[:, None],  #1
-                            (self.env_class == 17).float()[:, None], # 1
+                            # (self.env_class != 17).float()[:, None],  #1
+                            # (self.env_class == 17).float()[:, None], # 1
                             (self.dof_pos - self.default_dof_pos_all) * self.obs_scales.dof_pos, # h1:19
                             self.dof_vel * self.obs_scales.dof_vel,  # h1:19
                             self.action_history_buf[:, -1], # h1:19
                             self.contact_filt.float()-0.5, # 2
                             ),dim=-1)
 
+
+        # obs_buf = torch.cat((#skill_vector, 
+        #                     self.base_ang_vel  * self.obs_scales.ang_vel,   #[1,3] # 3
+        #                     self.base_quat,  # 4
+        #                     self.delta_yaw[:, None],  
+        #                     self.delta_next_yaw[:, None],
+        #                     self.commands[:, 0:1],
+        #                     (self.dof_pos - self.default_dof_pos_all) * self.obs_scales.dof_pos, # h1:19
+        #                     # self.dof_pos * self.obs_scales.dof_pos, # h1:19
+        #                     self.dof_vel * self.obs_scales.dof_vel,  # h1:19
+        #                     self.action_history_buf[:, -1], # h1:19
+        #                     ),dim=-1)
+        
+        obs_buf = torch.cat((
+                            self.base_ang_vel  * self.obs_scales.ang_vel,# 3
+                            self.base_quat, # 4
+                            self.delta_yaw[:, None], # 1
+                            self.delta_next_yaw[:, None],  # 1
+                            self.commands[:, 0:1], # 1
+                            (self.dof_pos - self.default_dof_pos_all) * self.obs_scales.dof_pos, # 12
+                            self.dof_vel * self.obs_scales.dof_vel,  # 12
+                            self.action_history_buf[:, -1], # 12
+                            ),dim=-1)
+
+
+        # print("obs_buf shape 1111111 : ", obs_buf.shape)  # should be (num_envs, obs_dim)
         priv_explicit = torch.cat((self.base_lin_vel * self.obs_scales.lin_vel,
                                    0 * self.base_lin_vel,
                                    0 * self.base_lin_vel), dim=-1)
@@ -575,20 +656,35 @@ class HumanoidRobot(BaseTask):
             self.motor_strength[0] - 1, 
             self.motor_strength[1] - 1
         ), dim=-1)
-        if self.cfg.terrain.measure_heights:
+        if self.cfg.terrain.measure_heights and terrain_config.mesh_type != 'None':
+            # import ipdb; ipdb.set_trace()
             heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.3 - self.measured_heights, -1, 1.)
             
-            self.obs_buf = torch.cat([obs_buf, heights, priv_explicit, priv_latent, self.obs_history_buf.view(self.num_envs, -1)], dim=-1)
+            self.privileged_obs_buf = torch.cat([privileged_obs_buf, heights, priv_explicit, priv_latent, self.obs_history_buf.view(self.num_envs, -1)], dim=-1)
+
+
+            self.obs_buf = torch.cat([obs_buf, heights,], dim=-1)
+
+
+
+            # print("heights = ", heights.shape)
+            # print("obs_buf shape 222222 : ", torch.cat([obs_buf, heights], dim=-1).shape)  # should be 
+        # elif self.cfg.terrain.measure_heights and self.terrain.mesh_type == 'None':
+        elif self.cfg.terrain.measure_heights and terrain_config.mesh_type == 'None':  
+            heights = torch.zeros((self.num_envs, 132), device=self.device)
+            self.privileged_obs_buf = torch.cat([privileged_obs_buf, heights, priv_explicit, priv_latent, self.obs_history_buf.view(self.num_envs, -1)], dim=-1)
+            self.obs_buf = torch.cat([obs_buf, heights], dim=-1)
         else:
-            self.obs_buf = torch.cat([obs_buf, priv_explicit, priv_latent, self.obs_history_buf.view(self.num_envs, -1)], dim=-1)
-        obs_buf[:, 6:8] = 0  
+            pass
+            # self.obs_buf = torch.cat([obs_buf, priv_explicit, priv_latent, self.obs_history_buf.view(self.num_envs, -1)], dim=-1)
+        privileged_obs_buf[:, 6:8] = 0  
 
         self.obs_history_buf = torch.where(
             (self.episode_length_buf <= 1)[:, None, None], 
-            torch.stack([obs_buf] * self.cfg.env.history_len, dim=1),
+            torch.stack([privileged_obs_buf] * self.cfg.env.history_len, dim=1),
             torch.cat([
                 self.obs_history_buf[:, 1:],
-                obs_buf.unsqueeze(1)
+                privileged_obs_buf.unsqueeze(1)
             ], dim=1)
         )
 
@@ -601,8 +697,11 @@ class HumanoidRobot(BaseTask):
             ], dim=1)
         )
 
+
+
+
         self.privileged_obs_buf = torch.cat([
-                self.obs_buf,
+                self.privileged_obs_buf,
                 stance_mask,
                 contact_mask,
             ], dim=1)    
@@ -624,16 +723,19 @@ class HumanoidRobot(BaseTask):
         start = time()
         print("*"*80)
         mesh_type = terrain_config.mesh_type
-
+        print(mesh_type == 'None')
         if mesh_type=='None':
             self.terrain = None
             self._create_ground_plane()
         else:
             self.terrain = Terrain(self.num_envs)
+            print("Finished init Terrain. Time taken {:.2f} s".format(time() - start))
+            start = time()
             self._create_trimesh()
 
         print("Finished creating ground. Time taken {:.2f} s".format(time() - start))
         print("*"*80)
+        # 1/0
         self._create_envs()
 
     def set_camera(self, position, lookat):
@@ -713,6 +815,7 @@ class HumanoidRobot(BaseTask):
         mass_params = np.concatenate([rand_mass, rand_com])
         return props, mass_params
     
+    
     def _post_physics_step_callback(self):
         """ Callback called before computing terminations, rewards, and observations
             Default behaviour: Compute ang vel command based on target and heading, compute measured terrain heights and randomly push robots
@@ -727,14 +830,21 @@ class HumanoidRobot(BaseTask):
             self.commands[:, 2] = torch.clip(0.8*wrap_to_pi(self.commands[:, 3] - heading), -1., 1.)
             self.commands[:, 2] *= torch.abs(self.commands[:, 2]) > self.cfg.commands.ang_vel_clip
         
-        if self.cfg.terrain.measure_heights:
-            if self.global_counter % self.cfg.depth.update_interval == 0:
-                self.measured_heights, self.measured_heights_data  = self._get_heights()
+        if self.cfg.terrain.measure_heights and terrain_config.mesh_type != 'None':
+            # if self.global_counter % self.cfg.depth.update_interval == 0:
+            self.measured_heights, self.measured_heights_data  = self._get_heights()
         if self.cfg.domain_rand.push_robots and  (self.common_step_counter % self.cfg.domain_rand.push_interval == 0):
             self._push_robots()
     
     def _gather_cur_goals(self, future=0):
+        # import ipdb; ipdb.set_trace()
         return self.env_goals.gather(1, (self.cur_goal_idx[:, None, None]+future).expand(-1, -1, self.env_goals.shape[-1])).squeeze(1)
+
+    def _gather_last_goals(self, future=0):
+        num_goals_tensor = terrain_config.num_goals * torch.ones(self.num_envs, dtype=torch.int64, device=self.device, requires_grad=False)
+        
+        return self.env_goals.gather(1, (num_goals_tensor[:, None, None]).expand(-1, -1, self.env_goals.shape[-1])).squeeze(1)
+
 
     def _resample_commands(self, env_ids):
         """ Randommly select commands of some environments
@@ -850,21 +960,55 @@ class HumanoidRobot(BaseTask):
             return
         
         dis_to_origin = torch.norm(self.root_states[env_ids, :2] - self.env_origins[env_ids, :2], dim=1)
-        threshold = self.commands[env_ids, 0] * self.cfg.env.episode_length_s
-        move_up =dis_to_origin > 0.8*threshold
-        move_down = dis_to_origin < 0.4*threshold
+
+        last_goal_pos = self._gather_last_goals()
         # import ipdb;ipdb.set_trace()
-        self.terrain_levels[env_ids] += 1 * move_up - 1 * move_down
+        # threshold = self.commands[env_ids, 0] * self.cfg.env.episode_length_s
+
+        threshold = last_goal_pos[env_ids, 0] - self.env_origins[env_ids, 0]
+        # print("threshold = ", last_goal_pos[env_ids, :2] -self.env_origins[env_ids, :2])
+        move_up =dis_to_origin > 0.85*threshold
+        # move_down = dis_to_origin < 0.4*threshold
+        move_down = dis_to_origin < 0.83*threshold
+        # print("move up or down: ", 1 * move_up - 1 * move_down)
+        # import ipdb;ipdb.set_trace()
+        # terrain_levels和target都从0初始化
+        self.terrain_levels_target[env_ids] += 1 * move_up - 1 * move_down
+        # self.terrain_levels_target[env_ids] = min(max_terrain_level,max(self.terrain_levels_target[env_ids], self.terrain_levels[env_ids]))
+        # self.terrain_levels[env_ids] = random(0, self.terrain_levels_target[env_ids])
+        # 
         # self.terrain_levels[env_ids] += 1 
         # print("terrain level = ", self.terrain_levels)
         # # Robots that solve the last level are sent to a random one
-        self.terrain_levels[env_ids] = torch.where(self.terrain_levels[env_ids]>=self.max_terrain_level,
-                                                   torch.randint_like(torch.zeros_like(self.terrain_levels[env_ids]), self.max_terrain_level),
-                                                   torch.clip(self.terrain_levels[env_ids], 0)) # (the minumum level is zero)
+        self.terrain_levels_target[env_ids] = torch.clip(self.terrain_levels_target[env_ids], 0, self.max_terrain_level-1)
+        # 向量化操作：为每个环境在0到其对应terrain_levels_target之间均匀采样
+        target_levels = self.terrain_levels_target[env_ids]
+
+        strategy_selector = torch.rand(len(env_ids), device=self.device)  # 决定使用哪种采样策略
+        uniform_values = torch.rand(len(env_ids), device=self.device)
+
+        sampled_levels = torch.where(
+            strategy_selector < 0.5,  # 50%的概率
+            target_levels,             # 直接使用目标等级
+            (uniform_values * target_levels).long()  # 在 [0, target_levels) 均匀采样
+        )
+        self.terrain_levels[env_ids] = torch.where(target_levels > 0, sampled_levels, 0)
+
+        # self.terrain_levels_target[env_ids] = torch.where(self.terrain_levels[env_ids]>=self.max_terrain_level,
+        #                                            torch.randint_like(torch.zeros_like(self.terrain_levels[env_ids]), self.max_terrain_level),
+        #                                            torch.clip(self.terrain_levels[env_ids], 0)) # (the minumum level is zero)
         
         self.env_class[env_ids] = self.terrain_class[self.terrain_levels[env_ids], self.terrain_types[env_ids]]
-        
+        # import ipdb; ipdb.set_trace()
         self.env_origins[env_ids] = self.terrain_origins[self.terrain_levels[env_ids], self.terrain_types[env_ids]]
+        
+        # 防止出生在 slope 的环境初始化在地里面
+        # terrain7_slope_mask = self.terrain_types[env_ids] == 7
+        # terrain7_slope_env_ids = env_ids[terrain7_slope_mask]
+        # if len(terrain7_slope_env_ids) > 0:
+        #     self.env_origins[terrain7_slope_env_ids, 2] += 0.10
+        ########
+
 
         temp = self.terrain_goals[self.terrain_levels, self.terrain_types]
         last_col = temp[:, -1].unsqueeze(1)
@@ -920,7 +1064,7 @@ class HumanoidRobot(BaseTask):
         str_rng = self.cfg.domain_rand.motor_strength_range
         self.motor_strength = (str_rng[1] - str_rng[0]) * torch.rand(2, self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False) + str_rng[0]
         if self.cfg.env.history_encoding:
-            self.obs_history_buf = torch.zeros(self.num_envs, self.cfg.env.history_len, self.cfg.env.n_proprio, device=self.device, dtype=torch.float)
+            self.obs_history_buf = torch.zeros(self.num_envs, self.cfg.env.history_len, self.cfg.env.n_proprio_priv, device=self.device, dtype=torch.float)
         self.action_history_buf = torch.zeros(self.num_envs, self.cfg.domain_rand.action_buf_len, self.num_dofs, device=self.device, dtype=torch.float)
         # self.contact_buf = torch.zeros(self.num_envs, self.cfg.env.contact_buf_len, 4, device=self.device, dtype=torch.float)
         self.contact_buf = torch.zeros(self.num_envs, self.cfg.env.contact_buf_len, 2, device=self.device, dtype=torch.float)
@@ -959,7 +1103,7 @@ class HumanoidRobot(BaseTask):
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
         print("default_dof_pos = ", self.default_dof_pos)
         self.default_dof_pos_all[:] = self.default_dof_pos[0]
-
+        print("**************************   dof_names= ", self.dof_names)
         self.height_update_interval = 1
         if hasattr(self.cfg.env, "height_update_dt"):
             self.height_update_interval = int(self.cfg.env.height_update_dt / (self.cfg.sim.dt * self.cfg.control.decimation))
@@ -1193,10 +1337,39 @@ class HumanoidRobot(BaseTask):
             self.env_origins = torch.zeros(self.num_envs, 3, device=self.device, requires_grad=False)
             self.env_class = torch.zeros(self.num_envs, device=self.device, requires_grad=False)
             # put robots at the origins defined by the terrain
-            max_init_level = self.cfg.terrain.max_init_terrain_level # 2
+            max_init_level = self.cfg.terrain.max_init_terrain_level # 2 好像是0？
+            print("max_init_level = ", max_init_level)
             if not self.cfg.terrain.curriculum: max_init_level = self.cfg.terrain.num_rows - 1
             self.terrain_levels = torch.randint(0, max_init_level+1, (self.num_envs,), device=self.device)
+            self.terrain_levels_target = self.terrain_levels.clone()
+            # self.terrain_levels_target
+
+
+            ########################################
+
+            # [NOTE] normal terrain type smaple:
             self.terrain_types = torch.div(torch.arange(self.num_envs, device=self.device), (self.num_envs/self.cfg.terrain.num_cols), rounding_mode='floor').to(torch.long)
+            
+            # # [NOTE] more stair terrain type smaple:
+            # stair_prop = 0.4
+            # num_terrain_stair_5 = int(self.num_envs * stair_prop)
+            # num_other = self.num_envs - num_terrain_stair_5
+            # terrain_types = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+            # terrain_types[:num_terrain_stair_5] = 5
+            # other_terrains = torch.cat([
+            #     torch.arange(0, 5, device=self.device),
+            #     torch.arange(6, 9, device=self.device) 
+            # ])
+
+            # repeated_terrains = other_terrains.repeat(num_other // len(other_terrains) + 1)
+            # terrain_types[num_terrain_stair_5:] = repeated_terrains[:num_other]
+            # self.terrain_types = terrain_types
+
+            # print(" multi stair ************************************   ")
+            
+            ########################################
+
+
             self.max_terrain_level = self.cfg.terrain.num_rows
             self.terrain_origins = torch.from_numpy(self.terrain.env_origins).to(self.device).to(torch.float)
 
@@ -1258,6 +1431,7 @@ class HumanoidRobot(BaseTask):
         sphere_geom_cur = gymutil.WireframeSphereGeometry(0.1, 32, 32, None, color=(0, 0, 1))
         sphere_geom_reached = gymutil.WireframeSphereGeometry(self.cfg.env.next_goal_threshold, 32, 32, None, color=(0, 1, 0))
         goals = self.terrain_goals[self.terrain_levels[self.lookat_id], self.terrain_types[self.lookat_id]].cpu().numpy()
+        # print("******** lookat id ", self.lookat_id)
         for i, goal in enumerate(goals):
             goal_xy = goal[:2] + self.terrain.cfg.border_size
             pts = (goal_xy/self.terrain.cfg.horizontal_scale).astype(int)
@@ -1448,10 +1622,19 @@ class HumanoidRobot(BaseTask):
         # penalize torques too close to the limit
         return torch.sum((torch.abs(self.torques) - self.torque_limits*self.cfg.rewards.soft_torque_limit).clip(min=0.), dim=1)
 
+    # def _reward_tracking_lin_vel(self):
+    #     # Tracking of linear velocity commands (xy axes)
+    #     lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
+    #     return torch.exp(-lin_vel_error/self.cfg.rewards.tracking_sigma)
+    
     def _reward_tracking_lin_vel(self):
         # Tracking of linear velocity commands (xy axes)
-        lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
+        lin_vel_error = torch.square(
+            0.5 * torch.ones_like(self.commands[:, 0]) - self.base_lin_vel[:, 0]
+        )
         return torch.exp(-lin_vel_error/self.cfg.rewards.tracking_sigma)
+    
+    
     
     def _reward_tracking_ang_vel(self):
         # Tracking of angular velocity commands (yaw) 
@@ -1514,14 +1697,21 @@ class HumanoidRobot(BaseTask):
         norm = torch.norm(self.target_pos_rel, dim=-1, keepdim=True)
         target_vec_norm = self.target_pos_rel / (norm + 1e-5)
         cur_vel = self.root_states[:, 7:9]
-        # print("target vec norm: ", target_vec_norm)
+        # print("target vec norm: ", target_vec_norm[0,:])
+        # print("cur vel = ", cur_vel[0,:])
         rew = torch.minimum(torch.sum(target_vec_norm * cur_vel, dim=-1), self.commands[:, 0]) / (self.commands[:, 0] + 1e-5)
         return rew
 
     def _reward_tracking_yaw(self):
         # print("target yaw:  ", self.target_yaw)
         rew = torch.exp(-torch.abs(self.target_yaw - self.yaw))
+        
         return rew
+    
+    def _reward_tracking_yaw_new(self):
+        # print("target yaw:  ", self.target_yaw)
+        yaw_error = torch.abs(self.target_yaw - self.yaw)
+        return yaw_error
 
     def _reward_feet_contact_number(self):
         contact = self.contact_forces[:, self.feet_indices, 2] > 5
@@ -1531,6 +1721,18 @@ class HumanoidRobot(BaseTask):
         reward = torch.where(contact == stance_mask, 1.0, -1.0)
         return torch.mean(reward, dim=1)
     
+
+    def _reward_single_foot_contact(self):
+        contact = self.contact_forces[:, self.feet_indices, 2] > 5
+        single_contact = torch.sum(contact, dim=1) == 1
+        double_contact = torch.sum(contact, dim=1) == 2
+        zero_contact = torch.sum(contact, dim=1) == 0
+
+        rew = 1.0 * single_contact - 0.5 * double_contact - 1.2 * zero_contact
+
+        return rew
+
+
     def _reward_feet_stumble(self):
         # Penalize feet hitting vertical surfaces
         rew = torch.any(torch.norm(self.contact_forces[:, self.feet_indices, :2], dim=2) >\
@@ -1540,8 +1742,13 @@ class HumanoidRobot(BaseTask):
 
     def _reward_hip_joint_deviation(self):
         return torch.square(torch.norm(torch.abs(self.dof_pos[:, [0, 2, 6, 8]]), dim=1))
+
     
     def _reward_g1_hip_joint_deviation(self):
+        return torch.square(torch.norm(torch.abs(self.dof_pos[:, [1, 2, 7, 8]]), dim=1))
+    
+
+    def _reward_n1_hip_joint_deviation(self):
         return torch.square(torch.norm(torch.abs(self.dof_pos[:, [1, 2, 7, 8]]), dim=1))
     
     def _reward_gr1_hip_joint_deviation(self):
@@ -1588,3 +1795,19 @@ class HumanoidRobot(BaseTask):
         return torch.exp(-torch.abs(base_height - self.cfg.rewards.squat_height_target)/self.cfg.rewards.tracking_sigma)
     
     
+
+
+
+
+
+    def _reward_ankle_torque(self):
+        # Penalize ankle torques
+        return torch.sum(torch.square(self.torques[:,[4,5,10,11]]), dim=1)
+
+    def _reward_ankle_action_rate(self):
+        # Penalize changes in actions
+        return torch.sum(torch.square(self.last_actions[:,[4,5,10,11]] - self.actions[:,[4,5,10,11]]), dim=1)
+    
+    def _reward_stuck(self):
+        # Penalize stuck
+        return (torch.abs(self.base_lin_vel[:, 0]) < 0.1) * (torch.abs(self.commands[:, 0]) > 0.1)

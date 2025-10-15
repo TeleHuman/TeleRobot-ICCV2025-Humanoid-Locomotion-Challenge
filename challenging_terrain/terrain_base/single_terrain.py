@@ -28,7 +28,7 @@ class single_terrain:
             stone_width_range=[0.6, 0.8],
             incline_height=0.1,
             pit_depth=[0.5, 1.]):
-    
+        # difficulty = np.clip(difficulty, None, 0.5)
         goals = np.zeros((num_goals, 2))
         pit_depth_val = np.random.uniform(pit_depth[0], pit_depth[1])
         pit_depth_grid = -round(pit_depth_val / terrain.vertical_scale)
@@ -236,7 +236,7 @@ class single_terrain:
                 start_y = 0,
                 platform_size=1.0, 
                 difficulty = 0.5,
-                height_range=[0.05, 0.25], #[0.1,0.2],
+                height_range=[0.01, 0.45], #[0.1,0.2],
                 size_range=[0.4,0.6]#[0.5,0.6]
                 ):
         # length_y = 8
@@ -310,14 +310,15 @@ class single_terrain:
             angle_range = [5.0,15.0],
             uphill=True
             ):    
-
+        platform_size = platform_size - 2
         goals = np.zeros((num_goals, 2))
         length_x_grid = round((length_x - platform_size) / terrain.horizontal_scale)
         length_y_grid = round(length_y / terrain.horizontal_scale)
         platform_size = round(platform_size/ terrain.horizontal_scale)
 
         for i in range(num_goals):
-            goals[i]=[start_x+platform_size+length_x_grid/num_goals*i,start_y+length_y_grid//2]
+            # change slope goal pos  to fit the actual terrain.
+            goals[i]=[start_x+platform_size+10+(length_x_grid-4)/num_goals*i,    start_y+length_y_grid//2]
 
         slope_angle = (angle_range[1]-angle_range[0])*difficulty + angle_range[0]
         angle_rad = math.radians(slope_angle)
@@ -343,7 +344,7 @@ class single_terrain:
             platform_size=1.0,
             difficulty = 0.5,
             gap_height = 2.,
-            gap_low_range = [0.3,0.4],
+            gap_low_range = [0.30,0.40],
             ):
         
         goals = np.zeros((num_goals, 2))

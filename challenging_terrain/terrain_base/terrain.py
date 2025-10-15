@@ -36,8 +36,10 @@ from scipy.ndimage import binary_dilation
 from .single_terrain import single_terrain
 from .combine_config import combine_config,generator
 
+from line_profiler import profile
 
 class Terrain:
+    @profile
     def __init__(self, num_robots) -> None:
         cfg = terrain_config
         self.cfg = terrain_config
@@ -70,7 +72,8 @@ class Terrain:
                         difficulty = i / (self.cfg.num_rows)
                     else:
                         difficulty=np.random.uniform(0, 1)
-                    terrain = self.make_terrain(difficulty)
+                        difficulty=np.random.uniform(0, 0.5)
+                    terrain = self.make_terrain(difficulty, j)
                     self.add_terrain_to_map(terrain, i, j)
   
         self.heightsamples = self.height_field_raw
@@ -96,17 +99,58 @@ class Terrain:
         max_height = (self.cfg.height[1] - self.cfg.height[0]) * difficulty + self.cfg.height[0]
         height = random.uniform(self.cfg.height[0], max_height)
         terrain_utils.random_uniform_terrain(terrain, min_height=-height, max_height=height, step=0.005, downsampled_scale=self.cfg.downsampled_scale)
+    
+    # def make_terrain(self,difficulty):
+    #     terrain = terrain_utils.SubTerrain(   "terrain",
+    #                             width=self.length_per_env_pixels,
+    #                             length=self.width_per_env_pixels,
+    #                             vertical_scale=self.cfg.vertical_scale,
+    #                             horizontal_scale=self.cfg.horizontal_scale)
+    #     pairs = [] 
+    #     weights = []
+    #     for item in combine_config.proportions:
+    #         terrain_type, index, weight = item
+    #         # import ipdb; ipdb.set_trace()
+    #         pairs.append((terrain_type, index)) 
+    #         weights.append(weight)  
+    #     total_weight = sum(weights)
+    #     normalized_weights = [w / total_weight for w in weights] if total_weight > 0 else weights
+        
+    #     selected_pair = random.choices(pairs, weights=normalized_weights, k=1)[0]
+    #     terrain_type, index = selected_pair  
+    #     # [NOTE] need to modify
+    #     if combine_config.first_stage:
+    #         difficulty = np.random.uniform(0.0, 0.0)
+    #     # else:
+    #     #     difficulty = np.random.uniform(0.5, 1.0)
+    #     print("diff = ", difficulty)
 
-    def make_terrain(self,difficulty):
+    #     if terrain_type == "single":
+    #         terrain = generator.single_create(terrain,index,difficulty)
+    #     elif terrain_type == "multiplication":
+    #         terrain = generator.multiplication_create(terrain,index,difficulty)
+    #     elif terrain_type == "addition":
+    #         terrain = generator.addition_create(terrain,index,difficulty)
+        
+
+    #     if not combine_config.first_stage:
+    #         roughness_difficulty = np.random.uniform(0.3, 0.7)
+    #         self.add_roughness(terrain,roughness_difficulty)
+    #     return terrain
+
+    def make_terrain(self,difficulty, terrain_id):
         terrain = terrain_utils.SubTerrain(   "terrain",
                                 width=self.length_per_env_pixels,
                                 length=self.width_per_env_pixels,
                                 vertical_scale=self.cfg.vertical_scale,
                                 horizontal_scale=self.cfg.horizontal_scale)
+        
+        ##########################
         pairs = [] 
         weights = []
         for item in combine_config.proportions:
             terrain_type, index, weight = item
+            # import ipdb; ipdb.set_trace()
             pairs.append((terrain_type, index)) 
             weights.append(weight)  
         total_weight = sum(weights)
@@ -119,9 +163,13 @@ class Terrain:
             difficulty = np.random.uniform(0.0, 0.0)
         # else:
         #     difficulty = np.random.uniform(0.5, 1.0)
-        
+        print("diff = ", difficulty)
+        ######################
+
+        # import ipdb; ipdb.set_trace()
+
         if terrain_type == "single":
-            terrain = generator.single_create(terrain,index,difficulty)
+            terrain = generator.single_create(terrain,terrain_id,difficulty)
         elif terrain_type == "multiplication":
             terrain = generator.multiplication_create(terrain,index,difficulty)
         elif terrain_type == "addition":
@@ -129,8 +177,8 @@ class Terrain:
         
 
         if not combine_config.first_stage:
-            roughness_difficulty = np.random.uniform(0.5, 1.0)
-            # self.add_roughness(terrain,roughness_difficulty)
+            roughness_difficulty = np.random.uniform(0.3, 0.7)
+            self.add_roughness(terrain,roughness_difficulty)
         return terrain
 
     def add_terrain_to_map(self, terrain, row, col):

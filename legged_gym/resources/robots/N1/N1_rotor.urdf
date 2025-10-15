@@ -55,14 +55,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0"
                     rpy="0 1.57 0"/>
             <geometry>
                 <cylinder length="0.12" radius="0.0415"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="left_thigh_yaw_link">
         <inertial>
@@ -79,14 +79,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 -0.08"
                     rpy="0 0 0"/>
             <geometry>
                 <cylinder length="0.19" radius="0.06"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="left_shank_pitch_link">
         <inertial>
@@ -184,14 +184,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0"
                     rpy="0 1.57 0"/>
             <geometry>
                 <cylinder length="0.12" radius="0.0415"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="right_thigh_yaw_link">
         <inertial>
@@ -208,14 +208,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 -0.08"
                     rpy="0 0 0"/>
             <geometry>
                 <cylinder length="0.19" radius="0.06"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="right_shank_pitch_link">
         <inertial>
@@ -310,14 +310,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0.04"
                     rpy="0 0 0"/>
             <geometry>
                 <cylinder length="0.055" radius="0.06"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="torso_link">
         <inertial>
@@ -339,7 +339,7 @@
                     xyz="0 0 -0.06"
                     rpy="0 0 0"/>
             <geometry>
-                <cylinder length="0.22" radius="0.1"/>
+                <cylinder length="0.15" radius="0.08"/>
             </geometry>
         </collision>
         <collision>
@@ -398,14 +398,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0"
                     rpy="0 0 0"/>
             <geometry>
                 <sphere radius="0.032"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="left_upper_arm_yaw_link">
         <inertial>
@@ -422,14 +422,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0"
                     rpy="0 0 0"/>
             <geometry>
                 <cylinder length="0.12" radius="0.032"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="left_lower_arm_pitch_link">
         <inertial>
@@ -462,14 +462,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0"
                     rpy="0 0 0"/>
             <geometry>
                 <cylinder length="0.12" radius="0.032"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="left_end_effector_link">
         <inertial>
@@ -486,14 +486,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0"
                     rpy="0 0 0"/>
             <geometry>
                 <sphere radius="0.02751"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="right_upper_arm_pitch_link">
         <inertial>
@@ -526,14 +526,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0"
                     rpy="0 0 0"/>
             <geometry>
                 <sphere radius="0.032"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="right_upper_arm_yaw_link">
         <inertial>
@@ -550,14 +550,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0"
                     rpy="0 0 0"/>
             <geometry>
                 <cylinder length="0.12" radius="0.032"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="right_lower_arm_pitch_link">
         <inertial>
@@ -590,14 +590,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0"
                     rpy="0 0 0"/>
             <geometry>
                 <cylinder length="0.12" radius="0.032"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <link name="right_end_effector_link">
         <inertial>
@@ -614,14 +614,14 @@
                 <color rgba="1.0 1.0 1.0 1.0"/>
             </material>
         </visual>
-        <collision>
+        <!-- <collision>
             <origin
                     xyz="0 0 0"
                     rpy="0 0 0"/>
             <geometry>
                 <sphere radius="0.02751"/>
             </geometry>
-        </collision>
+        </collision> -->
     </link>
     <joint name="left_hip_pitch_joint" type="revolute">
         <parent link="base_link"/>

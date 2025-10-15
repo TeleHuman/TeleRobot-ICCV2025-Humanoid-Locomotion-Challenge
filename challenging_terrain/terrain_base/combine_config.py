@@ -24,7 +24,8 @@ class combine_config:
         ]
 
         addition = [
-                [single[5],single[2],single[4],single[8]]
+                [single[5],single[2],single[4],single[8]],
+                [single[8],single[5]]
         ]
         if first_stage:
                 proportions = [
@@ -34,9 +35,15 @@ class combine_config:
                 ]
         else:  # [NOTE] need to modify the terrain for competition. 
                 proportions = [
-                        ("single", 5, 0.3),#
-                        # ("addition", 0, 0.5),
-                        # ("multiplication", 3, 0.4),
+                        # ("single", 0, 0.3),#
+                        # ("single", 1, 0.3),#
+                        ("single", 2, 0.3),#
+                        # ("single", 3, 0.3),#
+                        # ("single", 4, 0.3),#
+                        # ("single", 5, 0.3),#
+                        # ("single", 6, 0.3),#
+                        # ("single", 7, 0.3),#
+                        # ("single", 8, 0.3),#
                 ]
 
 class generator:

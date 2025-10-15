@@ -61,10 +61,13 @@ def play(args):
     env_cfg.env.num_envs = 20
     env_cfg.env.episode_length_s = 1000
     env_cfg.commands.resampling_time = 60
+    # env_cfg.commands.max_ranges.lin_vel_x = [0.2, 0.2]
+    # env_cfg.commands.ranges.lin_vel_y = [0.0, 0.0]
+    # env_cfg.commands.lin_vel_z = [0.0, 0.0]
     env_cfg.rewards.is_play = True
 
     env_cfg.terrain.num_rows = 5
-    env_cfg.terrain.num_cols = 10
+    env_cfg.terrain.num_cols = 9
     env_cfg.terrain.max_init_terrain_level = 1
 
     env_cfg.terrain.height = [0.01, 0.02]
@@ -119,7 +122,7 @@ def play(args):
         id = env.lookat_id
 
         times = env.total_times
-        if(times ==100):
+        if(times ==1e9):
             print("total_times=",env.total_times)
             print("success_rate=",env.success_times / env.total_times)
             print("complete_rate=",(env.complete_times / env.total_times).cpu().numpy().copy())

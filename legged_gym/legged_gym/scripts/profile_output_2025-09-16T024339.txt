@@ -1,0 +1,289 @@
+Timer unit: 1e-09 s
+
+Total time: 0.311828 s
+File: /home/lxz/ICCV2025-Challenge/legged_gym/legged_gym/envs/base/humanoid_robot.py
+Function: reset_idx at line 398
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   398                                               @profile
+   399                                               def reset_idx(self, env_ids):
+   400                                                   """ Reset some environments.
+   401                                                       Calls self._reset_dofs(env_ids), self._reset_root_states(env_ids), and self._resample_commands(env_ids)
+   402                                                       [Optional] calls self._update_terrain_curriculum(env_ids), self.update_command_curriculum(env_ids) and
+   403                                                       Logs episode info
+   404                                                       Resets some buffers
+   405                                           
+   406                                                   Args:
+   407                                                       env_ids (list[int]): List of environment ids which must be reset
+   408                                                   """
+   409       808    2216694.0   2743.4      0.7          import time
+   410       808     833476.0   1031.5      0.3          start_time = time.time()
+   411       808    3483883.0   4311.7      1.1          if len(env_ids) == 0:
+   412       780     162549.0    208.4      0.1              return
+   413                                                   
+   414        28      12741.0    455.0      0.0          if self.save:
+   415                                                       for env_id in env_ids:
+   416                                                           try:
+   417                                                               if len(self.current_episode_buffer['observations'][env_id]) > 750:
+   418                                                                   # 转换为numpy数组
+   419                                                                   episode_obs = np.stack(self.current_episode_buffer['observations'][env_id])  # [T,*]
+   420                                                                   episode_act = np.stack(self.current_episode_buffer['actions'][env_id])       # [T,*]
+   421                                                                   episode_rew = np.stack(self.current_episode_buffer['rewards'][env_id])      # [T]
+   422                                                                   episode_hei = np.stack(self.current_episode_buffer['height_map'][env_id])      # [T, 396]
+   423                                                                   episode_body = np.stack(self.current_episode_buffer['rigid_body_state'][env_id]) # [T,13,13] first is root
+   424                                                                   episode_dof = np.stack(self.current_episode_buffer['dof_state'][env_id])
+   425                                                                 
+   426                                                                   # 存入主数据存储
+   427                                                                   self.episode_data['observations'][env_id].append(episode_obs)
+   428                                                                   self.episode_data['actions'][env_id].append(episode_act)
+   429                                                                   self.episode_data['rewards'][env_id].append(episode_rew)
+   430                                                                   self.episode_data['height_map'][env_id].append(episode_hei)
+   431                                                                   self.episode_data['rigid_body_state'][env_id].append(episode_body)
+   432                                                                   self.episode_data['dof_state'][env_id].append(episode_dof)
+   433                                           
+   434                                                                   
+   435                                                                   # 处理privileged观测
+   436                                                                   if self.privileged_obs_buf is not None:
+   437                                                                       episode_priv = np.stack(self.current_episode_buffer['privileged_obs'][env_id]) # [T,*]
+   438                                                                       self.episode_data['privileged_obs'][env_id].append(episode_priv)
+   439                                                                   
+   440                                                                   # 清空当前buffer
+   441                                                                   self.current_episode_buffer['observations'][env_id] = []
+   442                                                                   self.current_episode_buffer['actions'][env_id] = []
+   443                                                                   self.current_episode_buffer['rewards'][env_id] = []
+   444                                                                   self.current_episode_buffer['height_map'][env_id] = []
+   445                                                                   self.current_episode_buffer['privileged_obs'][env_id] = []
+   446                                                                   self.current_episode_buffer['rigid_body_state'][env_id] = []
+   447                                                                   self.current_episode_buffer['dof_state'][env_id] = []
+   448                                                                   
+   449                                                                   print(f"Env {env_id} have saved {episode_obs.shape[0]} step data")
+   450                                                           except Exception as e:
+   451                                                               print(f"An error occured when saving env {env_id}: {str(e)}")
+   452                                                   
+   453                                                   # update curriculum
+   454        28      21082.0    752.9      0.0          if self.cfg.terrain.curriculum:
+   455        28   15776727.0 563454.5      5.1              self._update_terrain_curriculum(env_ids)
+   456                                                   # avoid updating command curriculum at each step since the maximum command is common to all envs
+   457        28      28543.0   1019.4      0.0          if self.cfg.commands.curriculum and (self.common_step_counter % self.max_episode_length==0):
+   458                                                       self.update_command_curriculum(env_ids)
+   459                                           
+   460                                                   # reset robot states
+   461        28   31954185.0 1.14e+06     10.2          self._reset_dofs(env_ids)
+   462        28   13926463.0 497373.7      4.5          self._reset_root_states(env_ids)
+   463        28    2673567.0  95484.5      0.9          self._resample_commands(env_ids)
+   464        28   82615358.0 2.95e+06     26.5          self.gym.simulate(self.sim)
+   465        28    7110655.0 253952.0      2.3          self.gym.fetch_results(self.sim, True)
+   466        28    4045073.0 144466.9      1.3          self.gym.refresh_rigid_body_state_tensor(self.sim)
+   467                                           
+   468                                                   # reset buffers
+   469        28    6094160.0 217648.6      2.0          self.last_last_actions[env_ids] = 0.
+   470        28    4319100.0 154253.6      1.4          self.last_actions[env_ids] = 0.
+   471        28    2220443.0  79301.5      0.7          self.last_foot_action[env_ids] = 0.
+   472        28    3326181.0 118792.2      1.1          self.last_dof_vel[env_ids] = 0.
+   473        28    2338259.0  83509.2      0.7          self.last_torques[env_ids] = 0.
+   474        28     416258.0  14866.4      0.1          self.last_root_vel[:] = 0.
+   475        28    3097687.0 110631.7      1.0          self.feet_air_time[env_ids] = 0.
+   476        28    2518375.0  89942.0      0.8          self.reset_buf[env_ids] = 1
+   477        28    4387912.0 156711.1      1.4          self.obs_history_buf[env_ids, :, :] = 0.  # reset obs history buffer TODO no 0s
+   478        28    3692703.0 131882.2      1.2          self.contact_buf[env_ids, :, :] = 0.
+   479        28    6603949.0 235855.3      2.1          self.action_history_buf[env_ids, :, :] = 0.
+   480        28    7180291.0 256439.0      2.3          self.cur_goal_idx[env_ids] = 0
+   481        28    7576149.0 270576.8      2.4          self.reach_goal_timer[env_ids] = 0
+   482                                           
+   483        28   10116075.0 361288.4      3.2          self.phase_length_buf[env_ids] = 0 
+   484                                           
+   485                                                   # fill extras
+   486        28      59732.0   2133.3      0.0          self.extras["episode"] = {}
+   487       504     218072.0    432.7      0.1          for key in self.episode_sums.keys():
+   488       476    9605946.0  20180.6      3.1              self.extras["episode"]['rew_' + key] = torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
+   489       476   69700947.0 146430.6     22.4              self.episode_sums[key][env_ids] = 0.
+   490        28    2901207.0 103614.5      0.9          self.episode_length_buf[env_ids] = 0
+   491                                           
+   492                                                   # log additional curriculum info
+   493        28      44597.0   1592.8      0.0          if self.cfg.terrain.curriculum:
+   494                                                       # print("terrain level = ", self.terrain_levels, " mean  ", torch.mean(self.terrain_levels.float()))
+   495        28     403254.0  14401.9      0.1              self.extras["episode"]["terrain_level"] = torch.mean(self.terrain_levels.float())
+   496        28      30528.0   1090.3      0.0          if self.cfg.commands.curriculum:
+   497                                                       self.extras["episode"]["max_command_x"] = self.command_ranges["lin_vel_x"][1]
+   498                                                   # send timeout info to the algorithm
+   499        28      26286.0    938.8      0.0          if self.cfg.env.send_timeouts:
+   500        28      37879.0   1352.8      0.0              self.extras["time_outs"] = self.time_out_buf
+   501                                           
+   502        28      50815.0   1814.8      0.0          end_time = time.time()
+   503                                                   # print(f"Reset {len(env_ids)} envs, took {end_time - start_time:.3f} seconds")
+
+Total time: 19.8831 s
+File: /home/lxz/ICCV2025-Challenge/legged_gym/legged_gym/envs/base/humanoid_robot.py
+Function: post_physics_step at line 299
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   299                                               @profile
+   300                                               def post_physics_step(self):
+   301                                                   """ check terminations, compute observations and rewards
+   302                                                       calls self._post_physics_step_callback() for common computations 
+   303                                                       calls self._draw_debug_vis() if needed
+   304                                                   """
+   305       807  134908711.0 167173.1      0.7          self.gym.refresh_actor_root_state_tensor(self.sim)
+   306       807    5811268.0   7201.1      0.0          self.gym.refresh_net_contact_force_tensor(self.sim)
+   307       807  133729656.0 165712.1      0.7          self.gym.refresh_rigid_body_state_tensor(self.sim)
+   308                                                   # self.gym.refresh_force_sensor_tensor(self.sim)
+   309                                           
+   310       807   21277062.0  26365.6      0.1          self.episode_length_buf += 1
+   311       807    4683862.0   5804.0      0.0          self.phase_length_buf += 1 
+   312       807    1061214.0   1315.0      0.0          self.common_step_counter += 1
+   313                                           
+   314                                                   # prepare quantities
+   315       807   21986577.0  27244.8      0.1          self.base_quat[:] = self.root_states[:, 3:7]
+   316       807  125835112.0 155929.5      0.6          self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
+   317       807   37160569.0  46047.8      0.2          self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
+   318       807   32142325.0  39829.4      0.2          self.projected_gravity[:] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
+   319       807   23211077.0  28762.2      0.1          self.base_lin_acc = (self.root_states[:, 7:10] - self.last_root_vel[:, :3]) / self.dt
+   320                                           
+   321       807   24913052.0  30871.2      0.1          self.knee_pos = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.knee_indices, 0:3]
+   322       807   10276414.0  12734.1      0.1          self.feet_pos = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices, 0:3]
+   323                                           
+   324       807  143029677.0 177236.3      0.7          self.roll, self.pitch, self.yaw = euler_from_quaternion(self.base_quat)
+   325                                           
+   326       807   50422162.0  62481.0      0.3          contact = torch.norm(self.contact_forces[:, self.feet_indices], dim=-1) > 2.
+   327       807   18321495.0  22703.2      0.1          self.contact_filt = torch.logical_or(contact, self.last_contacts) 
+   328       807     919567.0   1139.5      0.0          self.last_contacts = contact
+   329                                                   
+   330                                                   # self._update_jump_schedule()
+   331       807 1649462319.0 2.04e+06      8.3          self._update_goals()
+   332       807  522140953.0 647014.8      2.6          self._post_physics_step_callback()
+   333                                           
+   334                                                   # compute observations, rewards, resets, ...
+   335       807 1183274134.0 1.47e+06      6.0          self.check_termination()
+   336       807  922006419.0 1.14e+06      4.6          self.compute_reward()
+   337       807  277281432.0 343595.3      1.4          env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
+   338       807  292541211.0 362504.6      1.5          self.reset_idx(env_ids)
+   339                                           
+   340       807   26385477.0  32695.8      0.1          self.cur_goals = self._gather_cur_goals()
+   341       807   11792765.0  14613.1      0.1          self.next_goals = self._gather_cur_goals(future=1)
+   342                                           
+   343                                                   # self.update_depth_buffer()
+   344                                           
+   345       807  284217700.0 352190.5      1.4          self.compute_observations() # in some cases a simulation step might be required to refresh some obs (for example body positions)
+   346                                           
+   347       807    5538837.0   6863.5      0.0          self.last_last_actions[:] = self.last_actions[:]
+   348       807    3976818.0   4927.9      0.0          self.last_actions[:] = self.actions[:]
+   349       807    5065555.0   6277.0      0.0          self.last_dof_vel[:] = self.dof_vel[:]
+   350       807    3957045.0   4903.4      0.0          self.last_torques[:] = self.torques[:]
+   351       807    5326338.0   6600.2      0.0          self.last_root_vel[:] = self.root_states[:, 7:13]
+   352       807     420362.0    520.9      0.0          if(self.time_stamp ==5):
+   353       134    1298201.0   9688.1      0.0              self.last_foot_action = self.rigid_body_states[:, self.feet_indices, :]
+   354       134      61055.0    455.6      0.0              self.time_stamp=0
+   355                                                   else :
+   356       673     336903.0    500.6      0.0              self.time_stamp=self.time_stamp+1
+   357                                                   
+   358       807     796545.0    987.0      0.0          if self.viewer and self.enable_viewer_sync and self.debug_viz:
+   359       807    4342386.0   5380.9      0.0              self.gym.clear_lines(self.viewer)
+   360                                                       # self._draw_height_samples()
+   361       807     1.37e+10  1.7e+07     68.8              self._draw_goals()
+   362                                                       # self._draw_feet()
+   363       807    1029552.0   1275.8      0.0              if self.cfg.depth.use_camera:
+   364                                                           window_name = "Depth Image"
+   365                                                           cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+   366                                                           cv2.imshow("Depth Image", self.depth_buffer[self.lookat_id, -1].cpu().numpy() + 0.5)
+   367                                                           cv2.waitKey(1)
+   368                                           
+   369       807   14386771.0  17827.5      0.1          cur_knee_pos_trans = self.knee_pos - self.root_states[:, 0:3].unsqueeze(1)
+   370      2421    8841445.0   3652.0      0.0          for i in range(len(self.knee_indices)):
+   371      1614  131916107.0  81732.4      0.7              self.knee_pos_in_body[:, i, :] = quat_rotate_inverse(self.base_quat, cur_knee_pos_trans[:, i, :])
+   372                                           
+   373       807    6633679.0   8220.2      0.0          cur_feet_pos_trans = self.feet_pos - self.root_states[:, 0:3].unsqueeze(1)
+   374      2421    3293407.0   1360.3      0.0          for i in range(len(self.feet_indices)):
+   375      1614   43684317.0  27065.9      0.2              self.feet_pos_in_body[:, i, :] = quat_rotate_inverse(self.base_quat, cur_feet_pos_trans[:, i, :])
+
+Total time: 35.9928 s
+File: /home/lxz/ICCV2025-Challenge/legged_gym/legged_gym/envs/base/humanoid_robot.py
+Function: step at line 151
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   151                                               @profile
+   152                                               def step(self, actions):
+   153                                                   """ Apply actions, simulate, call self.post_physics_step()
+   154                                           
+   155                                                   Args:
+   156                                                       actions (torch.Tensor): Tensor of shape (num_envs, num_actions_per_env)
+   157                                                   """
+   158       807     936497.0   1160.5      0.0          start_t = time()
+   159       807    3269668.0   4051.6      0.0          actions.to(self.device)
+   160       807   21452252.0  26582.7      0.1          self.action_history_buf = torch.cat([self.action_history_buf[:, 1:].clone(), actions[:, None, :].clone()], dim=1)
+   161       807     871986.0   1080.5      0.0          if self.cfg.domain_rand.action_delay:
+   162                                                       if self.global_counter % self.cfg.domain_rand.delay_update_global_steps == 0:
+   163                                                           if len(self.cfg.domain_rand.action_curr_step) != 0:
+   164                                                               self.delay = torch.tensor(self.cfg.domain_rand.action_curr_step.pop(0), device=self.device, dtype=torch.float)
+   165                                                       if self.viewer:
+   166                                                           self.delay = torch.tensor(self.cfg.domain_rand.action_delay_view, device=self.device, dtype=torch.float)
+   167                                                       indices = -self.delay -1
+   168                                                       actions = self.action_history_buf[:, indices.long()] # delay for 1/50=20ms
+   169                                           
+   170       807     614839.0    761.9      0.0          self.global_counter += 1
+   171       807     731365.0    906.3      0.0          self.total_env_steps_counter += 1
+   172       807    1299401.0   1610.2      0.0          clip_actions = self.cfg.normalization.clip_actions / self.cfg.control.action_scale
+   173       807    7094922.0   8791.7      0.0          self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
+   174       807 3274769344.0 4.06e+06      9.1          self.render()
+   175                                                   # print("1111 coumse: ", time()-start_t)
+   176                                           
+   177       806    1016953.0   1261.7      0.0          start_t = time()
+   178      4030    3917004.0    972.0      0.0          for _ in range(self.cfg.control.decimation):
+   179      3224  226094650.0  70128.6      0.6              self.torques = self._compute_torques(self.actions).view(self.torques.shape)
+   180      3224 1451180966.0 450118.2      4.0              self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
+   181      3224 8984394760.0 2.79e+06     25.0              self.gym.simulate(self.sim)
+   182      3224 1630270212.0 505666.9      4.5              self.gym.fetch_results(self.sim, True)
+   183      3224  567308616.0 175964.2      1.6              self.gym.refresh_dof_state_tensor(self.sim)
+   184       806     1.98e+10 2.45e+07     55.0          self.post_physics_step()
+   185                                                   # print("2222 coumse: ", time()-start_t)
+   186                                           
+   187       806    1227894.0   1523.4      0.0          start_t = time()
+   188       806    1013459.0   1257.4      0.0          clip_obs = self.cfg.normalization.clip_observations
+   189       806   11634685.0  14435.1      0.0          self.obs_buf = torch.clip(self.obs_buf, -clip_obs, clip_obs)
+   190       806     711966.0    883.3      0.0          if self.privileged_obs_buf is not None:
+   191       806    3774828.0   4683.4      0.0              self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
+   192       806   10952844.0  13589.1      0.0          self.extras["delta_yaw_ok"] = self.delta_yaw < 0.6
+   193       806     541498.0    671.8      0.0          if self.cfg.depth.use_camera and self.global_counter % self.cfg.depth.update_interval == 0:
+   194                                                       self.extras["depth"] = self.depth_buffer[:, -2]  # have already selected last one
+   195                                                   else:
+   196       806     266796.0    331.0      0.0              self.extras["depth"] = None
+   197                                                   # print("3333 coumse: ", time()-start_t)
+   198                                           
+   199       806     490527.0    608.6      0.0          if self.save:
+   200                                                       for env_idx in range(self.num_envs):
+   201                                                           self.current_episode_buffer['observations'][env_idx].append(
+   202                                                               self.obs_buf[env_idx].cpu().numpy().copy())  
+   203                                                           self.current_episode_buffer['actions'][env_idx].append(
+   204                                                               self.actions[env_idx].cpu().numpy().copy())      
+   205                                                           
+   206                                                           self.current_episode_buffer['rewards'][env_idx].append(
+   207                                                               self.rew_buf[env_idx].cpu().numpy().copy()) 
+   208                                                           
+   209                                                           self.current_episode_buffer['height_map'][env_idx].append(
+   210                                                               self.measured_heights_data[env_idx].cpu().numpy().copy()) 
+   211                                                           
+   212                                                           self.current_episode_buffer['rigid_body_state'][env_idx].append(
+   213                                                               self.rigid_body_states[env_idx].cpu().numpy().copy()) 
+   214                                                           
+   215                                                           self.current_episode_buffer['dof_state'][env_idx].append(
+   216                                                               self.dof_state[env_idx].cpu().numpy().copy())  
+   217                                           
+   218                                                           if self.privileged_obs_buf is not None:
+   219                                                               self.current_episode_buffer['privileged_obs'][env_idx].append(
+   220                                                                   self.privileged_obs_buf[env_idx].cpu().numpy().copy())      
+   221                                           
+   222       806     895823.0   1111.4      0.0          if(self.cfg.rewards.is_play):
+   223                                                       if(self.total_times > 0):
+   224                                                           if(self.total_times > self.last_times):
+   225                                                               # print("total_times=",self.total_times)
+   226                                                               # print("success_rate=",self.success_times / self.total_times)
+   227                                                               # print("complete_rate=",(self.complete_times / self.total_times).cpu().numpy().copy())
+   228                                                               self.last_times = self.total_times
+   229                                           
+   230       806     404355.0    501.7      0.0          return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras
+
+  0.31 seconds - /home/lxz/ICCV2025-Challenge/legged_gym/legged_gym/envs/base/humanoid_robot.py:398 - reset_idx
+ 19.88 seconds - /home/lxz/ICCV2025-Challenge/legged_gym/legged_gym/envs/base/humanoid_robot.py:299 - post_physics_step
+ 35.99 seconds - /home/lxz/ICCV2025-Challenge/legged_gym/legged_gym/envs/base/humanoid_robot.py:151 - step

@@ -69,10 +69,14 @@ class H1_2FixCfg( LeggedRobotCfg ):
         n_scan = 132
         n_priv = 3 + 3 + 3 
         n_priv_latent = 4 + 1 + 12 + 12 
-        n_proprio = 51 
+        n_proprio = 43+3 # 51 
+        n_proprio_priv = 49 #51
         history_len = 10
-        num_observations = n_proprio + n_scan + history_len*n_proprio + n_priv_latent + n_priv 
-        num_privileged_obs = num_observations  + 4
+        num_observations = n_proprio + n_scan
+        # num_observations = n_proprio_priv + n_scan + history_len*n_proprio + n_priv_latent + n_priv 
+
+        num_privileged_obs = 709 +4 # 4 for contact & stance mask  #731
+
         num_actions = 12
         env_spacing = 3.
 
@@ -104,13 +108,15 @@ class H1_2FixCfg( LeggedRobotCfg ):
         decimation = 4
 
     class asset( LeggedRobotCfg.asset ):
-        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/h1_2/h1_2_fix_arm.urdf'
+        # file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/h1_2/h1_2_fix_arm.urdf'
+        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/h1_2/h1_2_fix_arm_simplify_no_upper_collision.urdf'
+
         name = "h1_2_fix"
         foot_name = "ankle_roll"
         knee_name = "knee"
         penalize_contacts_on = ["hip", "knee"]
         terminate_after_contacts_on = ["pelvis"]
-        self_collisions = 1 
+        self_collisions = 0  # 1 to disable, 0 to enable...bitwise filter
         flip_visual_attachments = False
 
     class domain_rand(LeggedRobotCfg.domain_rand):
@@ -136,11 +142,11 @@ class H1_2FixCfg( LeggedRobotCfg ):
 
     class commands( LeggedRobotCfg.commands ):
         class ranges( LeggedRobotCfg.commands.ranges ):
-            lin_vel_x = [0.1, 0.8]
+            lin_vel_x = [0.6, 0.8]
             lin_vel_y = [0.0, 0.0]
             ang_vel_yaw = [0, 0]
             heading = [0, 0]
-        cycletime = 0.02 * 50 # frequence * frames  # 50
+        cycletime = 0.02 * 40 # frequence * frames  # 50
 
     class rewards(LeggedRobotCfg.rewards):
         min_dist = 0.2
@@ -155,8 +161,8 @@ class H1_2FixCfg( LeggedRobotCfg ):
                 termination = -0.0
                 tracking_lin_vel = 2.0
                 tracking_ang_vel = 0.8
-                tracking_goal_vel = 1.5
-                tracking_yaw = 0.7
+                tracking_goal_vel = 5 # 15 # 1.5
+                tracking_yaw = 2 # 7 # 0.7
                 lin_vel_z = -2.0
                 ang_vel_xy = -0.05
                 orientation = -2.0
@@ -171,46 +177,34 @@ class H1_2FixCfg( LeggedRobotCfg ):
                 hip_joint_deviation = -1.2
                 stand_still = -0.
                 feet_contact_number = 2.0 
+                single_foot_contact = 2.0
+                # 先训练一个第一阶段的 -- 不要phase（priv的obs和rewards）*********** TODO
                 feet_distance = 0.2
                 knee_distance = 0.2
+
+                # 约束脚踝不要过分运动
+                ankle_torque = -1e-02 #-5e-6 #-5e-5
+                ankle_action_rate = -0.02 #-0.005 #-0.02
 
             ######################
 
             # # [NOTE]  second stage
             if not first_stage:
                 termination = -0.0
-                tracking_goal_vel = 1.5
-                tracking_yaw = 0.7
+                tracking_lin_vel = 3.0
+                tracking_yaw = 2.0 #1.2  
                 lin_vel_z = -0.5
                 ang_vel_xy = -0.05
                 orientation = -2.0
                 torques = -0.00001
-                # dof_vel = -1e-3 # -0.
                 dof_acc = -2.5e-8
                 base_height = -0. 
-                # feet_air_time =  1.0
-
-
-                hip_joint_deviation = -0.5
-                # dof_pos_limits = -2.0
-                # dof_vel_limits = -1.0
-                # torque_limits = -1.0
-                
-                # feet_slippage = -0.25
-                # feet_contact_force = -2.5e-4
-                
+                hip_joint_deviation = -0.8 /2
                 collision = -10.
-                feet_stumble = -1.5 
+                feet_stumble = -2.0 #-1.5
                 action_rate = -0.01
-                # feet_contact_number = 0.0 
-
-                feet_edge = -5.0
-
-                # encourage higher 
-                # high_knees_height = 2
-                # high_feet_height = 2
-                # base_height = 2.0
-                # feet_lateral_distance = 0.5 
+                feet_edge = -3.0
+                stuck = -5.0
             
 
         only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
@@ -229,12 +223,13 @@ class H1_2FixCfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):
         entropy_coef = 0.01
     class runner( LeggedRobotCfgPPO.runner ):
-        run_name = ''
+        run_name = 'h1_2'
         experiment_name = 'h1_2_fix'
+        max_iterations = 1000001
         save_interval = 500
 
     class estimator(LeggedRobotCfgPPO.estimator):
-        train_with_estimated_states = True
+        train_with_estimated_states = False
         learning_rate = 1.e-4
         hidden_dims = [128, 64]
         priv_states_dim = H1_2FixCfg.env.n_priv

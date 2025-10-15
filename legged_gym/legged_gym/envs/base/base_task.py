@@ -118,7 +118,7 @@ class BaseTask():
             self.gym.subscribe_viewer_keyboard_event(
                 self.viewer, gymapi.KEY_D, "right_turn")
         self.free_cam = False
-        self.lookat_id = 0
+        self.lookat_id = 7
         self.lookat_vec = torch.tensor([-0, 2, 1], requires_grad=False, device=self.device)
 
     def get_observations(self):
