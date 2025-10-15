@@ -21,10 +21,11 @@ pip install "numpy<1.24" pydelatin wandb tqdm opencv-python ipdb pyfqmr flask
 `cd legged_gym/scripts`
 
 1. Set both first_stage flag in combine_terrain.py & envs/{robot}/{robot}.py to __True__. Train 1st stage base policy on flat terrain(Robots are able to walk after around 1000 iterations.):  
+We have released first stage base policy for all humanoid platforms.
 ```
 python train.py --exptid h1-2 --device cuda:0 --headless --task h1_2_fix
 ```
-We have released first stage base policy for all humanoid platforms.
+
 
 2. Set both first_stage flag to **False**. Training Recovery 2nd stage on multi-terrains:
 ```
