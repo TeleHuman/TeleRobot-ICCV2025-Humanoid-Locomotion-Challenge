@@ -26,7 +26,7 @@ pip install "numpy<1.24" pydelatin wandb tqdm opencv-python ipdb pyfqmr flask
 python train.py --exptid h1-2 --device cuda:0 --headless --task h1_2_fix
 ```
 
-2. Set bot first_stage falg to **False**. Training Recovery 2nd stage on multi-terrains:
+2. Set both first_stage falg to **False**. Training Recovery 2nd stage on multi-terrains:
 ```
 python train.py --exptid h1-2 --device cuda:0 --resume --resumeid=test --checkpoint=1000--headless --task h1_2_fix
 ```
