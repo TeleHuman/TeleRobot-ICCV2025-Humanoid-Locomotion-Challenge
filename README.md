@@ -1,3 +1,5 @@
+### Challenge Link ###
+[Challenge Official Website](https://human-robot-scene.github.io/Terrain-Challenge/#scenarios)
 
 ### Installation ###
 ```bash
